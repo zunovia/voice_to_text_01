@@ -1,0 +1,25 @@
+{
+  "api_key": "YOUR_GROQ_API_KEY_HERE",
+  "gemini_api_key": "",
+  "use_gemini_cleanup": false,
+  "hotkey": "f2",
+  "mode": "toggle",
+  "language": "ja",
+  "sample_rate": 16000,
+  "voice_commands": {
+    "エンター": "\n",
+    "改行": "\n",
+    "ピリオド": "。",
+    "句点": "。",
+    "読点": "、",
+    "カンマ": "、",
+    "まる": "。",
+    "てん": "、",
+    "かっこ": "（",
+    "かっことじ": "）",
+    "かぎかっこ": "「",
+    "かぎかっことじ": "」",
+    "タブ": "\t",
+    "スペース": " "
+  }
+}
