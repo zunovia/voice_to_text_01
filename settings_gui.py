@@ -22,16 +22,16 @@ class SettingsGUI:
 
         root = tk.Tk()
         root.title("Voice to Text - Settings")
-        root.geometry("520x580")
-        root.resizable(False, False)
+        root.geometry("520x750")
+        root.resizable(False, True)
         root.attributes("-topmost", True)
         root.configure(bg=BG_COLOR)
 
         # Center on screen
         root.update_idletasks()
         x = (root.winfo_screenwidth() - 520) // 2
-        y = (root.winfo_screenheight() - 580) // 2
-        root.geometry(f"520x580+{x}+{y}")
+        y = (root.winfo_screenheight() - 750) // 2
+        root.geometry(f"520x750+{x}+{y}")
         root.lift()
         root.focus_force()
 
