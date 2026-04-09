@@ -1,29 +1,31 @@
 import tkinter as tk
 import threading
-import time
 import collections
 
 
 class RecordingOverlay:
-    """Overlay window with real-time waveform visualization."""
+    """Overlay window with real-time waveform visualization and Gemini toggle."""
 
-    WIDTH = 300
-    HEIGHT = 100
+    WIDTH = 320
+    HEIGHT = 110
     WAVE_COLOR = "#4FC3F7"
     WAVE_COLOR_LOUD = "#FF7043"
     BG_COLOR = "#1E1E1E"
     BAR_COUNT = 40
 
-    def __init__(self):
+    def __init__(self, on_gemini_toggle=None):
         self._root = None
         self._canvas = None
         self._label = None
+        self._gemini_btn = None
         self._visible = False
         self._thread = None
         self._ready = threading.Event()
         self._levels = collections.deque([0.0] * self.BAR_COUNT, maxlen=self.BAR_COUNT)
         self._waveform = [0.0] * self.BAR_COUNT
         self._animating = False
+        self._gemini_on = False
+        self._on_gemini_toggle = on_gemini_toggle
 
     def start(self):
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -43,14 +45,17 @@ class RecordingOverlay:
             self._root.after(0, lambda: self._label.config(text=text))
 
     def update_audio(self, level: float, waveform: list):
-        """Called from recorder's audio callback with real-time data."""
         self._levels.append(level)
         if waveform:
-            # Pad or trim to BAR_COUNT
             if len(waveform) >= self.BAR_COUNT:
                 self._waveform = waveform[:self.BAR_COUNT]
             else:
                 self._waveform = waveform + [0.0] * (self.BAR_COUNT - len(waveform))
+
+    def set_gemini_state(self, enabled: bool):
+        self._gemini_on = enabled
+        if self._root and self._gemini_btn:
+            self._root.after(0, self._update_gemini_btn)
 
     def destroy(self):
         if self._root:
@@ -68,15 +73,32 @@ class RecordingOverlay:
         main_frame = tk.Frame(self._root, bg=self.BG_COLOR, padx=10, pady=6)
         main_frame.pack(fill="both", expand=True)
 
-        # Status label
+        # Top row: status label + Gemini button
+        top_frame = tk.Frame(main_frame, bg=self.BG_COLOR)
+        top_frame.pack(fill="x")
+
         self._label = tk.Label(
-            main_frame,
+            top_frame,
             text="Recording...",
             font=("Segoe UI", 10, "bold"),
             fg="#FFFFFF",
             bg=self.BG_COLOR,
         )
-        self._label.pack(anchor="w")
+        self._label.pack(side="left")
+
+        # Gemini toggle button
+        self._gemini_btn = tk.Label(
+            top_frame,
+            text="Gemini OFF",
+            font=("Segoe UI", 8),
+            fg="#999999",
+            bg="#333333",
+            padx=6,
+            pady=1,
+            cursor="hand2",
+        )
+        self._gemini_btn.pack(side="right")
+        self._gemini_btn.bind("<Button-1>", self._on_gemini_click)
 
         # Waveform canvas
         self._canvas = tk.Canvas(
@@ -96,14 +118,33 @@ class RecordingOverlay:
         y = screen_h - self.HEIGHT - 60
         self._root.geometry(f"{self.WIDTH}x{self.HEIGHT}+{x}+{y}")
 
-        # Add rounded corner effect via transparent bg
         self._root.withdraw()
         self._ready.set()
         self._root.mainloop()
 
+    def _update_gemini_btn(self):
+        if self._gemini_btn:
+            if self._gemini_on:
+                self._gemini_btn.config(
+                    text="Gemini ON",
+                    fg="#FFFFFF",
+                    bg="#4CAF50",
+                )
+            else:
+                self._gemini_btn.config(
+                    text="Gemini OFF",
+                    fg="#999999",
+                    bg="#333333",
+                )
+
+    def _on_gemini_click(self, event):
+        if self._on_gemini_toggle:
+            self._on_gemini_toggle()
+
     def _do_show(self, text: str):
         if self._label:
             self._label.config(text=text)
+        self._update_gemini_btn()
         if self._root:
             screen_w = self._root.winfo_screenwidth()
             screen_h = self._root.winfo_screenheight()
@@ -136,7 +177,6 @@ class RecordingOverlay:
         gap = 1
 
         for i in range(self.BAR_COUNT):
-            # Use waveform data (signed, -1 to 1)
             val = abs(self._waveform[i]) if i < len(self._waveform) else 0.0
             bar_h = max(2, val * h * 0.9)
 
@@ -145,7 +185,6 @@ class RecordingOverlay:
             y0 = mid_y - bar_h / 2
             y1 = mid_y + bar_h / 2
 
-            # Color based on amplitude
             if val > 0.3:
                 color = self.WAVE_COLOR_LOUD
             elif val > 0.05:
@@ -155,6 +194,5 @@ class RecordingOverlay:
 
             canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline="")
 
-        # Repeat at ~30fps
         if self._animating:
             self._root.after(33, self._animate)

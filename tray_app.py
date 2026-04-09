@@ -40,10 +40,12 @@ def _create_icon(color: str = "green", size: int = 64) -> Image.Image:
 
 
 class TrayApp:
-    def __init__(self, on_settings=None, on_quit=None, on_mode_toggle=None):
+    def __init__(self, on_settings=None, on_quit=None, on_mode_toggle=None, on_gemini_toggle=None):
         self.on_settings = on_settings or (lambda: None)
         self.on_quit = on_quit or (lambda: None)
         self.on_mode_toggle = on_mode_toggle or (lambda: None)
+        self.on_gemini_toggle = on_gemini_toggle or (lambda: None)
+        self._gemini_cleanup = False
         self._icon_normal = _create_icon("green")
         self._icon_recording = _create_icon("red")
         self._icon_processing = _create_icon("orange")
@@ -69,6 +71,10 @@ class TrayApp:
             pystray.MenuItem(
                 lambda item: f"モード切替 (現在: {'Push-to-Talk' if self._current_mode == 'push_to_talk' else 'Toggle'})",
                 self._toggle_mode,
+            ),
+            pystray.MenuItem(
+                lambda item: f"Gemini文章整形: {'ON (高精度)' if self._gemini_cleanup else 'OFF (高速)'}",
+                self._toggle_gemini,
             ),
             pystray.MenuItem("設定を開く", self._open_settings),
             pystray.MenuItem(
@@ -102,6 +108,12 @@ class TrayApp:
 
     def set_mode(self, mode: str):
         self._current_mode = mode
+
+    def set_gemini_cleanup(self, enabled: bool):
+        self._gemini_cleanup = enabled
+
+    def _toggle_gemini(self):
+        self.on_gemini_toggle()
 
     def _toggle_autostart(self):
         if is_autostart_enabled():

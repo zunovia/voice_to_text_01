@@ -87,8 +87,9 @@ class VoiceToTextApp:
         threading.Thread(target=self._preload_vad, daemon=True).start()
 
         # Initialize overlay
-        self.overlay = RecordingOverlay()
+        self.overlay = RecordingOverlay(on_gemini_toggle=self._toggle_gemini_cleanup)
         self.overlay.start()
+        self.overlay.set_gemini_state(self.config.get("use_gemini_cleanup", False))
 
         # Connect recorder audio levels to overlay waveform
         self.recorder.set_level_callback(
@@ -106,8 +107,10 @@ class VoiceToTextApp:
             on_settings=self._show_settings,
             on_quit=self._quit,
             on_mode_toggle=self._toggle_mode,
+            on_gemini_toggle=self._toggle_gemini_cleanup,
         )
         self.tray.set_mode(self.config.get("mode", "push_to_talk"))
+        self.tray.set_gemini_cleanup(self.config.get("use_gemini_cleanup", False))
 
         hotkey = self.config.get("hotkey", "ctrl+shift+space")
         mode = self.config.get("mode", "push_to_talk")
@@ -116,39 +119,79 @@ class VoiceToTextApp:
         self.tray.start()  # This blocks until quit
 
     def _prompt_api_key(self) -> bool:
-        """Show a dialog to enter API key on first run."""
+        """Show a welcome dialog to enter API key on first run."""
+        import webbrowser
         result = {"key": ""}
 
+        BG = "#1a1a2e"
+        CARD = "#16213e"
+        HIGHLIGHT = "#4FC3F7"
+        GREEN = "#4CAF50"
+
         root = tk.Tk()
-        root.title("Voice-to-Text - Initial Setup")
-        root.geometry("500x250")
+        root.title("Voice to Text")
+        root.geometry("500x420")
         root.resizable(False, False)
         root.attributes("-topmost", True)
+        root.configure(bg=BG)
 
-        # Center on screen
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
+        if os.path.exists(icon_path):
+            try:
+                root.iconbitmap(icon_path)
+            except Exception:
+                pass
+
         root.update_idletasks()
         x = (root.winfo_screenwidth() - 500) // 2
-        y = (root.winfo_screenheight() - 250) // 2
-        root.geometry(f"500x250+{x}+{y}")
-
-        # Force to foreground
+        y = (root.winfo_screenheight() - 420) // 2
+        root.geometry(f"500x420+{x}+{y}")
         root.lift()
         root.focus_force()
 
-        frame = ttk.Frame(root, padding=20)
-        frame.pack(fill="both", expand=True)
+        main = tk.Frame(root, bg=BG, padx=30, pady=20)
+        main.pack(fill="both", expand=True)
 
-        ttk.Label(
-            frame,
-            text="Voice-to-Text へようこそ!\n\nGemini API Key を入力してください。\nhttps://aistudio.google.com/apikey から取得できます。",
-            justify="center",
-            wraplength=400,
-        ).pack(pady=(0, 15))
+        # Title
+        tk.Label(main, text="Voice to Text", font=("Segoe UI", 22, "bold"),
+                 fg="#FFFFFF", bg=BG).pack(pady=(0, 3))
+        tk.Label(main, text="どのアプリでも声でテキスト入力", font=("Segoe UI", 10),
+                 fg="#888888", bg=BG).pack(pady=(0, 20))
+
+        # Card
+        card = tk.Frame(main, bg=CARD, padx=20, pady=15)
+        card.pack(fill="x")
+
+        tk.Label(card, text="Groq API Key を入力してください", font=("Segoe UI", 11, "bold"),
+                 fg=HIGHLIGHT, bg=CARD).pack(anchor="w", pady=(0, 5))
+        tk.Label(card, text="無料で取得できます（14,400回/日まで無料）", font=("Segoe UI", 9),
+                 fg="#888888", bg=CARD).pack(anchor="w", pady=(0, 10))
 
         key_var = tk.StringVar()
-        entry = ttk.Entry(frame, textvariable=key_var, width=55)
-        entry.pack(pady=(0, 15))
+        entry = tk.Entry(card, textvariable=key_var, width=50,
+                         bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
+                         relief="flat", font=("Consolas", 11))
+        entry.pack(fill="x", pady=(0, 10))
         entry.focus_set()
+
+        # Get API key link
+        link_frame = tk.Frame(card, bg=CARD)
+        link_frame.pack(fill="x", pady=(0, 5))
+        tk.Label(link_frame, text="APIキーを持っていない場合:", font=("Segoe UI", 9),
+                 fg="#888888", bg=CARD).pack(side="left")
+        link = tk.Label(link_frame, text="Groqで無料取得", font=("Segoe UI", 9, "underline"),
+                        fg=HIGHLIGHT, bg=CARD, cursor="hand2")
+        link.pack(side="left", padx=(5, 0))
+        link.bind("<Button-1>", lambda e: webbrowser.open("https://console.groq.com/keys"))
+
+        # Steps
+        steps = tk.Label(card, text="1. 上のリンクからGroqにサインアップ\n2. API Keys → Create API Key\n3. キーをコピーして上の欄に貼り付け",
+                         font=("Segoe UI", 9), fg="#666666", bg=CARD, justify="left")
+        steps.pack(anchor="w", pady=(5, 0))
+
+        # Buttons
+        btn_frame = tk.Frame(main, bg=BG)
+        btn_frame.pack(pady=(20, 0))
 
         def on_save():
             key = key_var.get().strip()
@@ -161,10 +204,16 @@ class VoiceToTextApp:
         def on_cancel():
             root.destroy()
 
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack()
-        ttk.Button(btn_frame, text="Save", command=on_save).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="Cancel", command=on_cancel).pack(side="left", padx=5)
+        save_btn = tk.Button(btn_frame, text="はじめる", font=("Segoe UI", 12, "bold"),
+                             fg="#FFFFFF", bg=GREEN, activebackground="#388E3C",
+                             relief="flat", padx=30, pady=5, cursor="hand2",
+                             command=on_save)
+        save_btn.pack(side="left", padx=5)
+        cancel_btn = tk.Button(btn_frame, text="キャンセル", font=("Segoe UI", 10),
+                               fg="#888888", bg="#333333", activebackground="#444444",
+                               relief="flat", padx=15, pady=5, cursor="hand2",
+                               command=on_cancel)
+        cancel_btn.pack(side="left", padx=5)
 
         root.bind("<Return>", lambda e: on_save())
         root.protocol("WM_DELETE_WINDOW", on_cancel)
@@ -277,6 +326,24 @@ class VoiceToTextApp:
         if self.tray:
             self.tray.set_mode(new_mode)
         log.info(f"Mode switched to: {new_mode}")
+
+    def _toggle_gemini_cleanup(self):
+        current = self.config.get("use_gemini_cleanup", False)
+        new_val = not current
+        self.config["use_gemini_cleanup"] = new_val
+        save_config(self.config)
+
+        # Update transcriber
+        gemini_key = self.config.get("gemini_api_key", "") if new_val else ""
+        self.transcriber = Transcriber(
+            self.config["api_key"],
+            gemini_api_key=gemini_key,
+        )
+        if self.tray:
+            self.tray.set_gemini_cleanup(new_val)
+        if self.overlay:
+            self.overlay.set_gemini_state(new_val)
+        log.info(f"Gemini cleanup: {'ON' if new_val else 'OFF'}")
 
     def _quit(self):
         log.info("Shutting down...")
