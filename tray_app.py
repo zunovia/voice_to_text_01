@@ -126,9 +126,8 @@ class TrayApp:
             self._icon.stop()
 
     def _open_settings(self):
-        """Open settings by launching a separate Python process to avoid tkinter thread issues."""
-        settings_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings_gui.py")
-        subprocess.Popen([sys.executable, settings_script], creationflags=0x00000008)  # DETACHED_PROCESS
+        """Open settings via callback to main app."""
+        self.on_settings()
 
     def _toggle_mode(self):
         self.on_mode_toggle()

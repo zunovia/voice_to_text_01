@@ -6,4 +6,5 @@ build/
 *.egg-info/
 config.json
 voicetotext.log
+.lock
 .env

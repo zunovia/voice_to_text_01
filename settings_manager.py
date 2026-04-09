@@ -1,7 +1,19 @@
 import json
 import os
+import sys
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+def _get_app_dir() -> str:
+    """Get the directory where config/log files should be stored.
+    For exe: the directory containing the exe.
+    For script: the directory containing main.py.
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+CONFIG_PATH = os.path.join(_get_app_dir(), "config.json")
 
 DEFAULT_CONFIG = {
     "api_key": "",

@@ -6,7 +6,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 # Setup logging to file (essential for pythonw where there's no console)
-LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voicetotext.log")
+def _get_app_dir():
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+APP_DIR = _get_app_dir()
+LOG_PATH = os.path.join(APP_DIR, "voicetotext.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -119,9 +125,9 @@ class VoiceToTextApp:
         self.tray.start()  # This blocks until quit
 
     def _prompt_api_key(self) -> bool:
-        """Show a welcome dialog to enter API key on first run."""
+        """Show a welcome dialog to enter API keys on first run."""
         import webbrowser
-        result = {"key": ""}
+        result = {"groq_key": "", "gemini_key": ""}
 
         BG = "#1a1a2e"
         CARD = "#16213e"
@@ -130,12 +136,12 @@ class VoiceToTextApp:
 
         root = tk.Tk()
         root.title("Voice to Text")
-        root.geometry("500x420")
+        root.geometry("520x560")
         root.resizable(False, False)
         root.attributes("-topmost", True)
         root.configure(bg=BG)
 
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
+        icon_path = os.path.join(APP_DIR, "icon.ico")
         if os.path.exists(icon_path):
             try:
                 root.iconbitmap(icon_path)
@@ -143,63 +149,84 @@ class VoiceToTextApp:
                 pass
 
         root.update_idletasks()
-        x = (root.winfo_screenwidth() - 500) // 2
-        y = (root.winfo_screenheight() - 420) // 2
-        root.geometry(f"500x420+{x}+{y}")
+        x = (root.winfo_screenwidth() - 520) // 2
+        y = (root.winfo_screenheight() - 560) // 2
+        root.geometry(f"520x560+{x}+{y}")
         root.lift()
         root.focus_force()
 
-        main = tk.Frame(root, bg=BG, padx=30, pady=20)
+        main = tk.Frame(root, bg=BG, padx=30, pady=15)
         main.pack(fill="both", expand=True)
 
         # Title
         tk.Label(main, text="Voice to Text", font=("Segoe UI", 22, "bold"),
                  fg="#FFFFFF", bg=BG).pack(pady=(0, 3))
         tk.Label(main, text="どのアプリでも声でテキスト入力", font=("Segoe UI", 10),
-                 fg="#888888", bg=BG).pack(pady=(0, 20))
+                 fg="#888888", bg=BG).pack(pady=(0, 15))
 
-        # Card
-        card = tk.Frame(main, bg=CARD, padx=20, pady=15)
-        card.pack(fill="x")
+        # === Groq Card (必須) ===
+        groq_card = tk.Frame(main, bg=CARD, padx=15, pady=12)
+        groq_card.pack(fill="x", pady=(0, 10))
 
-        tk.Label(card, text="Groq API Key を入力してください", font=("Segoe UI", 11, "bold"),
-                 fg=HIGHLIGHT, bg=CARD).pack(anchor="w", pady=(0, 5))
-        tk.Label(card, text="無料で取得できます（14,400回/日まで無料）", font=("Segoe UI", 9),
-                 fg="#888888", bg=CARD).pack(anchor="w", pady=(0, 10))
+        groq_header = tk.Frame(groq_card, bg=CARD)
+        groq_header.pack(fill="x", pady=(0, 5))
+        tk.Label(groq_header, text="Groq API Key（必須・無料）", font=("Segoe UI", 11, "bold"),
+                 fg=HIGHLIGHT, bg=CARD).pack(side="left")
+        groq_link = tk.Label(groq_header, text="取得する", font=("Segoe UI", 9, "underline"),
+                             fg=HIGHLIGHT, bg=CARD, cursor="hand2")
+        groq_link.pack(side="right")
+        groq_link.bind("<Button-1>", lambda e: webbrowser.open("https://console.groq.com/keys"))
 
-        key_var = tk.StringVar()
-        entry = tk.Entry(card, textvariable=key_var, width=50,
-                         bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
-                         relief="flat", font=("Consolas", 11))
-        entry.pack(fill="x", pady=(0, 10))
-        entry.focus_set()
+        tk.Label(groq_card, text="音声認識エンジン（14,400回/日まで無料）", font=("Segoe UI", 9),
+                 fg="#888888", bg=CARD).pack(anchor="w", pady=(0, 5))
 
-        # Get API key link
-        link_frame = tk.Frame(card, bg=CARD)
-        link_frame.pack(fill="x", pady=(0, 5))
-        tk.Label(link_frame, text="APIキーを持っていない場合:", font=("Segoe UI", 9),
-                 fg="#888888", bg=CARD).pack(side="left")
-        link = tk.Label(link_frame, text="Groqで無料取得", font=("Segoe UI", 9, "underline"),
-                        fg=HIGHLIGHT, bg=CARD, cursor="hand2")
-        link.pack(side="left", padx=(5, 0))
-        link.bind("<Button-1>", lambda e: webbrowser.open("https://console.groq.com/keys"))
+        groq_var = tk.StringVar()
+        groq_entry = tk.Entry(groq_card, textvariable=groq_var, width=55,
+                              bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
+                              relief="flat", font=("Consolas", 10))
+        groq_entry.pack(fill="x", pady=(0, 5))
+        groq_entry.focus_set()
 
-        # Steps
-        steps = tk.Label(card, text="1. 上のリンクからGroqにサインアップ\n2. API Keys → Create API Key\n3. キーをコピーして上の欄に貼り付け",
-                         font=("Segoe UI", 9), fg="#666666", bg=CARD, justify="left")
-        steps.pack(anchor="w", pady=(5, 0))
+        tk.Label(groq_card, text="1. Groqにサインアップ → 2. API Keys → 3. Create API Key",
+                 font=("Segoe UI", 8), fg="#666666", bg=CARD).pack(anchor="w")
 
-        # Buttons
+        # === Gemini Card (オプション) ===
+        gemini_card = tk.Frame(main, bg=CARD, padx=15, pady=12)
+        gemini_card.pack(fill="x", pady=(0, 10))
+
+        gemini_header = tk.Frame(gemini_card, bg=CARD)
+        gemini_header.pack(fill="x", pady=(0, 5))
+        tk.Label(gemini_header, text="Gemini API Key（オプション）", font=("Segoe UI", 11, "bold"),
+                 fg="#FFA726", bg=CARD).pack(side="left")
+        gemini_link = tk.Label(gemini_header, text="取得する", font=("Segoe UI", 9, "underline"),
+                               fg=HIGHLIGHT, bg=CARD, cursor="hand2")
+        gemini_link.pack(side="right")
+        gemini_link.bind("<Button-1>", lambda e: webbrowser.open("https://aistudio.google.com/apikey"))
+
+        tk.Label(gemini_card, text="文章整形AI（句読点・改行を自動整形、月約150円）", font=("Segoe UI", 9),
+                 fg="#888888", bg=CARD).pack(anchor="w", pady=(0, 5))
+
+        gemini_var = tk.StringVar()
+        gemini_entry = tk.Entry(gemini_card, textvariable=gemini_var, width=55,
+                                bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
+                                relief="flat", font=("Consolas", 10))
+        gemini_entry.pack(fill="x", pady=(0, 5))
+
+        tk.Label(gemini_card, text="空欄でもOK（後から設定画面で追加できます）",
+                 font=("Segoe UI", 8), fg="#666666", bg=CARD).pack(anchor="w")
+
+        # === Buttons ===
         btn_frame = tk.Frame(main, bg=BG)
-        btn_frame.pack(pady=(20, 0))
+        btn_frame.pack(pady=(15, 0))
 
         def on_save():
-            key = key_var.get().strip()
-            if key:
-                result["key"] = key
-                root.destroy()
-            else:
-                messagebox.showwarning("Warning", "API Key を入力してください!", parent=root)
+            key = groq_var.get().strip()
+            if not key:
+                messagebox.showwarning("Warning", "Groq API Key を入力してください!", parent=root)
+                return
+            result["groq_key"] = key
+            result["gemini_key"] = gemini_var.get().strip()
+            root.destroy()
 
         def on_cancel():
             root.destroy()
@@ -220,10 +247,13 @@ class VoiceToTextApp:
 
         root.mainloop()
 
-        if result["key"]:
-            self.config["api_key"] = result["key"]
+        if result["groq_key"]:
+            self.config["api_key"] = result["groq_key"]
+            if result["gemini_key"]:
+                self.config["gemini_api_key"] = result["gemini_key"]
+                self.config["use_gemini_cleanup"] = True
             save_config(self.config)
-            log.info("API Key saved successfully.")
+            log.info("API Keys saved successfully.")
             return True
         return False
 
@@ -353,11 +383,44 @@ class VoiceToTextApp:
             self.overlay.destroy()
 
 
+def check_single_instance():
+    """Prevent multiple instances using a lock file."""
+    lock_path = os.path.join(APP_DIR, ".lock")
+    try:
+        if os.path.exists(lock_path):
+            # Check if PID in lock file is still running
+            with open(lock_path, "r") as f:
+                old_pid = int(f.read().strip())
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x1000, False, old_pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if handle:
+                kernel32.CloseHandle(handle)
+                # Process still running
+                show_error("Voice to Text", "既に起動しています。\nタスクバー右下のアイコンを確認してください。")
+                return False
+        # Write our PID
+        with open(lock_path, "w") as f:
+            f.write(str(os.getpid()))
+        return True
+    except Exception:
+        return True
+
+
 if __name__ == "__main__":
     try:
+        if not check_single_instance():
+            sys.exit(0)
         app = VoiceToTextApp()
         app.run()
     except Exception as e:
         log.error(f"Fatal error: {e}", exc_info=True)
         show_error("Voice-to-Text Error", f"Unexpected error:\n{e}")
         sys.exit(1)
+    finally:
+        # Clean up lock file
+        lock_path = os.path.join(APP_DIR, ".lock")
+        try:
+            os.remove(lock_path)
+        except Exception:
+            pass
