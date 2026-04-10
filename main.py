@@ -69,12 +69,19 @@ class VoiceToTextApp:
         self._tk_root = None
 
     def run(self):
+        from splash import SplashScreen
+
         # Check for API key first - show GUI prompt
         api_key = self.config.get("api_key", "")
         if not api_key or api_key.startswith("YOUR_") or len(api_key) < 10:
             if not self._prompt_api_key():
                 show_error("Voice-to-Text", "API Key is required to use this app.\nPlease restart and enter your Gemini API Key.")
                 sys.exit(1)
+
+        # Show splash screen while loading
+        splash = SplashScreen()
+        splash.show()
+        splash.update("Initializing...")
 
         # Initialize transcriber
         try:
@@ -85,7 +92,9 @@ class VoiceToTextApp:
                 self.config["api_key"],
                 gemini_api_key=gemini_key,
             )
+            splash.update("Loading voice detection...")
         except Exception as e:
+            splash.close()
             log.error(f"Failed to init transcriber: {e}")
             show_error("Voice-to-Text Error", f"Failed to initialize:\n{e}")
             sys.exit(1)
@@ -111,6 +120,11 @@ class VoiceToTextApp:
 
         # Setup hotkey manager
         self._setup_hotkey()
+
+        splash.update("Ready!")
+        import time
+        time.sleep(0.5)
+        splash.close()
 
         # Setup and run system tray (blocks main thread)
         self.tray = TrayApp(

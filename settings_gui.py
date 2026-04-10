@@ -116,11 +116,19 @@ class SettingsGUI:
         groq_link.pack(side="right")
         groq_link.bind("<Button-1>", lambda e: webbrowser.open("https://console.groq.com/keys"))
 
-        groq_var = tk.StringVar(value=config.get("api_key", ""))
+        groq_current = config.get("api_key", "")
+        groq_has_key = bool(groq_current and not groq_current.startswith("YOUR_") and len(groq_current) > 10)
+        groq_var = tk.StringVar(value=groq_current if groq_has_key else "")
         groq_entry = tk.Entry(api_card, textvariable=groq_var, width=55, show="*",
                               bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
                               relief="flat", font=("Consolas", 10))
-        groq_entry.pack(fill="x", pady=(0, 8))
+        groq_entry.pack(fill="x", pady=(0, 2))
+        groq_status = tk.Label(api_card,
+                               text="API Key 設定済み" if groq_has_key else "未設定",
+                               font=("Segoe UI", 8),
+                               fg=GREEN if groq_has_key else "#FF5252",
+                               bg=CARD_COLOR)
+        groq_status.pack(anchor="w", pady=(0, 6))
 
         # Gemini
         gemini_frame = tk.Frame(api_card, bg=CARD_COLOR)
@@ -132,11 +140,19 @@ class SettingsGUI:
         gemini_link.pack(side="right")
         gemini_link.bind("<Button-1>", lambda e: webbrowser.open("https://aistudio.google.com/apikey"))
 
-        gemini_var = tk.StringVar(value=config.get("gemini_api_key", ""))
+        gemini_current = config.get("gemini_api_key", "")
+        gemini_has_key = bool(gemini_current and len(gemini_current) > 10)
+        gemini_var = tk.StringVar(value=gemini_current if gemini_has_key else "")
         gemini_entry = tk.Entry(api_card, textvariable=gemini_var, width=55, show="*",
                                 bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
                                 relief="flat", font=("Consolas", 10))
-        gemini_entry.pack(fill="x", pady=(0, 6))
+        gemini_entry.pack(fill="x", pady=(0, 2))
+        gemini_status = tk.Label(api_card,
+                                 text="API Key 設定済み (オプション)" if gemini_has_key else "未設定 (オプション)",
+                                 font=("Segoe UI", 8),
+                                 fg=GREEN if gemini_has_key else "#888888",
+                                 bg=CARD_COLOR)
+        gemini_status.pack(anchor="w", pady=(0, 4))
 
         gemini_cleanup_var = tk.BooleanVar(value=config.get("use_gemini_cleanup", False))
         tk.Checkbutton(api_card, text=t("settings_gemini_check", L),
