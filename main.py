@@ -70,7 +70,8 @@ class VoiceToTextApp:
 
     def run(self):
         # Check for API key first - show GUI prompt
-        if not self.config.get("api_key"):
+        api_key = self.config.get("api_key", "")
+        if not api_key or api_key.startswith("YOUR_") or len(api_key) < 10:
             if not self._prompt_api_key():
                 show_error("Voice-to-Text", "API Key is required to use this app.\nPlease restart and enter your Gemini API Key.")
                 sys.exit(1)
