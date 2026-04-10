@@ -1,0 +1,123 @@
+"""Internationalization - UI text in Japanese and English."""
+
+TEXTS = {
+    "ja": {
+        # Overlay
+        "recording": "録音中...",
+        "processing": "変換中...",
+        "error": "エラー!",
+        "gemini_on": "Gemini ON",
+        "gemini_off": "Gemini OFF",
+
+        # Tray
+        "tray_app_name": "Voice to Text",
+        "tray_ready": "Voice to Text\nF2 で録音",
+        "tray_recording": "Voice to Text [録音中...]",
+        "tray_processing": "Voice to Text [変換中...]",
+        "tray_usage_toggle": "使い方: F2 で開始/停止",
+        "tray_usage_ptt": "使い方: F2 を押しながら話す",
+        "tray_mode_switch": "モード切替",
+        "tray_mode_ptt": "Push-to-Talk",
+        "tray_mode_toggle": "Toggle",
+        "tray_gemini_on": "Gemini文章整形: ON (高精度)",
+        "tray_gemini_off": "Gemini文章整形: OFF (高速)",
+        "tray_settings": "設定を開く",
+        "tray_autostart_on": "自動起動: ON",
+        "tray_autostart_off": "自動起動: OFF",
+        "tray_quit": "終了",
+
+        # Setup
+        "setup_title": "Voice to Text",
+        "setup_subtitle": "どのアプリでも声でテキスト入力",
+        "setup_groq_title": "Groq API Key（必須・無料）",
+        "setup_groq_desc": "音声認識エンジン（14,400回/日まで無料）",
+        "setup_groq_steps": "1. Groqにサインアップ → 2. API Keys → 3. Create API Key",
+        "setup_groq_link": "取得する",
+        "setup_gemini_title": "Gemini API Key（オプション）",
+        "setup_gemini_desc": "文章整形AI（句読点・改行を自動整形、月約150円）",
+        "setup_gemini_optional": "空欄でもOK（後から設定画面で追加できます）",
+        "setup_start": "はじめる",
+        "setup_cancel": "キャンセル",
+        "setup_groq_required": "Groq API Key を入力してください!",
+
+        # Settings
+        "settings_title": "Voice to Text Settings",
+        "settings_save": " 保存 ",
+        "settings_saved": "保存しました!",
+        "settings_save_failed": "設定の保存に失敗しました。",
+        "settings_api_keys": "API Keys",
+        "settings_groq_label": "Groq API Key (STT - 無料)",
+        "settings_gemini_label": "Gemini API Key (文章整形 - オプション)",
+        "settings_gemini_check": "Gemini文章整形を有効にする（高精度・やや遅い）",
+        "settings_get_key": "取得する",
+        "settings_controls": "操作設定",
+        "settings_hotkey_note": "※ デフォルトのホットキーは F2（Fn+F2）です。F2で録音開始、もう一度F2で停止します。",
+        "settings_hotkey": "ホットキー:",
+        "settings_language": "言語:",
+        "settings_mode_toggle": "Toggle（1回押して開始、もう1回で停止）",
+        "settings_mode_ptt": "Push-to-Talk（キーを押している間だけ録音）",
+        "settings_groq_required": "Groq API Key を入力してください!",
+    },
+    "en": {
+        # Overlay
+        "recording": "Recording...",
+        "processing": "Processing...",
+        "error": "Error!",
+        "gemini_on": "Gemini ON",
+        "gemini_off": "Gemini OFF",
+
+        # Tray
+        "tray_app_name": "Voice to Text",
+        "tray_ready": "Voice to Text\nPress F2 to record",
+        "tray_recording": "Voice to Text [Recording...]",
+        "tray_processing": "Voice to Text [Processing...]",
+        "tray_usage_toggle": "Usage: F2 to start/stop",
+        "tray_usage_ptt": "Usage: Hold F2 to record",
+        "tray_mode_switch": "Switch mode",
+        "tray_mode_ptt": "Push-to-Talk",
+        "tray_mode_toggle": "Toggle",
+        "tray_gemini_on": "Gemini cleanup: ON (accurate)",
+        "tray_gemini_off": "Gemini cleanup: OFF (fast)",
+        "tray_settings": "Settings",
+        "tray_autostart_on": "Auto-start: ON",
+        "tray_autostart_off": "Auto-start: OFF",
+        "tray_quit": "Quit",
+
+        # Setup
+        "setup_title": "Voice to Text",
+        "setup_subtitle": "Voice input for any application",
+        "setup_groq_title": "Groq API Key (Required - Free)",
+        "setup_groq_desc": "Speech recognition (14,400 requests/day free)",
+        "setup_groq_steps": "1. Sign up at Groq → 2. API Keys → 3. Create API Key",
+        "setup_groq_link": "Get key",
+        "setup_gemini_title": "Gemini API Key (Optional)",
+        "setup_gemini_desc": "Text formatting AI (auto punctuation, ~$1/month)",
+        "setup_gemini_optional": "Leave blank for now (can add later in Settings)",
+        "setup_start": "Start",
+        "setup_cancel": "Cancel",
+        "setup_groq_required": "Please enter your Groq API Key!",
+
+        # Settings
+        "settings_title": "Voice to Text Settings",
+        "settings_save": " Save ",
+        "settings_saved": "Saved!",
+        "settings_save_failed": "Failed to save settings.",
+        "settings_api_keys": "API Keys",
+        "settings_groq_label": "Groq API Key (STT - Free)",
+        "settings_gemini_label": "Gemini API Key (Formatting - Optional)",
+        "settings_gemini_check": "Enable Gemini text formatting (accurate, slightly slower)",
+        "settings_get_key": "Get key",
+        "settings_controls": "Controls",
+        "settings_hotkey_note": "Default hotkey is F2 (Fn+F2). Press F2 to start recording, press again to stop.",
+        "settings_hotkey": "Hotkey:",
+        "settings_language": "Language:",
+        "settings_mode_toggle": "Toggle (press once to start, again to stop)",
+        "settings_mode_ptt": "Push-to-Talk (hold key to record)",
+        "settings_groq_required": "Please enter your Groq API Key!",
+    },
+}
+
+
+def t(key: str, lang: str = "ja") -> str:
+    """Get translated text. Falls back to Japanese."""
+    return TEXTS.get(lang, TEXTS["ja"]).get(key, TEXTS["ja"].get(key, key))

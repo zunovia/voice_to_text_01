@@ -4,6 +4,7 @@ import webbrowser
 import os
 import sys
 from settings_manager import load_config, save_config
+from i18n import t
 
 
 BG_COLOR = "#1a1a2e"
@@ -26,6 +27,7 @@ class SettingsGUI:
 
     def show(self):
         config = load_config()
+        L = config.get("language", "ja")
 
         root = tk.Tk()
         root.title("Voice to Text - Settings")
@@ -48,16 +50,15 @@ class SettingsGUI:
             except Exception:
                 pass
 
-        # Custom style
         style = ttk.Style()
         style.theme_use("clam")
         style.configure("Dark.TCombobox", fieldbackground="#2a2a4a", foreground="#000000")
 
-        # === Top bar (fixed) ===
+        # === Top bar (fixed) with save button ===
         top_bar = tk.Frame(root, bg="#111122", pady=8)
         top_bar.pack(side="top", fill="x")
 
-        tk.Label(top_bar, text="Voice to Text Settings", font=("Segoe UI", 14, "bold"),
+        tk.Label(top_bar, text=t("settings_title", L), font=("Segoe UI", 14, "bold"),
                  fg="#FFFFFF", bg="#111122").pack(side="left", padx=(15, 0))
 
         status_var = tk.StringVar(value="")
@@ -65,7 +66,7 @@ class SettingsGUI:
         def on_save():
             api_key = groq_var.get().strip()
             if not api_key:
-                messagebox.showwarning("Warning", "Groq API Key を入力してください!", parent=root)
+                messagebox.showwarning("Warning", t("settings_groq_required", L), parent=root)
                 return
             config["api_key"] = api_key
             config["gemini_api_key"] = gemini_var.get().strip()
@@ -79,9 +80,9 @@ class SettingsGUI:
                 root.destroy()
             else:
                 from settings_manager import CONFIG_PATH
-                messagebox.showerror("Error", f"設定の保存に失敗しました。\n{CONFIG_PATH}", parent=root)
+                messagebox.showerror("Error", f"{t('settings_save_failed', L)}\n{CONFIG_PATH}", parent=root)
 
-        save_btn = tk.Button(top_bar, text=" 保存 ", font=("Segoe UI", 11, "bold"),
+        save_btn = tk.Button(top_bar, text=t("settings_save", L), font=("Segoe UI", 11, "bold"),
                              fg="#FFFFFF", bg=GREEN, activebackground="#388E3C",
                              relief="flat", padx=15, pady=3, cursor="hand2",
                              command=on_save)
@@ -91,25 +92,23 @@ class SettingsGUI:
                                 fg=GREEN, bg="#111122")
         status_label.pack(side="right", padx=(0, 10))
 
-        # === Main content (scrollable area above bottom bar) ===
+        # === Main content ===
         main = tk.Frame(root, bg=BG_COLOR, padx=20, pady=10)
         main.pack(side="top", fill="both", expand=True)
-
-        # (Title is in top bar)
 
         # === API Section ===
         api_card = tk.Frame(main, bg=CARD_COLOR, padx=15, pady=10)
         api_card.pack(fill="x", pady=(0, 8))
 
-        tk.Label(api_card, text="API Keys", font=("Segoe UI", 12, "bold"),
+        tk.Label(api_card, text=t("settings_api_keys", L), font=("Segoe UI", 12, "bold"),
                  fg=HIGHLIGHT, bg=CARD_COLOR).pack(anchor="w", pady=(0, 6))
 
         # Groq
         groq_frame = tk.Frame(api_card, bg=CARD_COLOR)
         groq_frame.pack(fill="x", pady=(0, 4))
-        tk.Label(groq_frame, text="Groq API Key (STT - 無料)", font=("Segoe UI", 9),
+        tk.Label(groq_frame, text=t("settings_groq_label", L), font=("Segoe UI", 9),
                  fg=TEXT_COLOR, bg=CARD_COLOR).pack(side="left")
-        groq_link = tk.Label(groq_frame, text="取得する", font=("Segoe UI", 9, "underline"),
+        groq_link = tk.Label(groq_frame, text=t("settings_get_key", L), font=("Segoe UI", 9, "underline"),
                              fg=HIGHLIGHT, bg=CARD_COLOR, cursor="hand2")
         groq_link.pack(side="right")
         groq_link.bind("<Button-1>", lambda e: webbrowser.open("https://console.groq.com/keys"))
@@ -122,9 +121,9 @@ class SettingsGUI:
         # Gemini
         gemini_frame = tk.Frame(api_card, bg=CARD_COLOR)
         gemini_frame.pack(fill="x", pady=(0, 4))
-        tk.Label(gemini_frame, text="Gemini API Key (文章整形 - オプション)", font=("Segoe UI", 9),
+        tk.Label(gemini_frame, text=t("settings_gemini_label", L), font=("Segoe UI", 9),
                  fg=TEXT_COLOR, bg=CARD_COLOR).pack(side="left")
-        gemini_link = tk.Label(gemini_frame, text="取得する", font=("Segoe UI", 9, "underline"),
+        gemini_link = tk.Label(gemini_frame, text=t("settings_get_key", L), font=("Segoe UI", 9, "underline"),
                                fg=HIGHLIGHT, bg=CARD_COLOR, cursor="hand2")
         gemini_link.pack(side="right")
         gemini_link.bind("<Button-1>", lambda e: webbrowser.open("https://aistudio.google.com/apikey"))
@@ -135,7 +134,7 @@ class SettingsGUI:
                  relief="flat", font=("Consolas", 10)).pack(fill="x", pady=(0, 6))
 
         gemini_cleanup_var = tk.BooleanVar(value=config.get("use_gemini_cleanup", False))
-        tk.Checkbutton(api_card, text="Gemini文章整形を有効にする（高精度・やや遅い）",
+        tk.Checkbutton(api_card, text=t("settings_gemini_check", L),
                        variable=gemini_cleanup_var, font=("Segoe UI", 9),
                        fg=TEXT_COLOR, bg=CARD_COLOR, selectcolor=ACCENT_COLOR,
                        activebackground=CARD_COLOR, activeforeground=TEXT_COLOR).pack(anchor="w")
@@ -144,23 +143,23 @@ class SettingsGUI:
         ctrl_card = tk.Frame(main, bg=CARD_COLOR, padx=15, pady=10)
         ctrl_card.pack(fill="x", pady=(0, 8))
 
-        tk.Label(ctrl_card, text="操作設定", font=("Segoe UI", 12, "bold"),
+        tk.Label(ctrl_card, text=t("settings_controls", L), font=("Segoe UI", 12, "bold"),
                  fg=HIGHLIGHT, bg=CARD_COLOR).pack(anchor="w", pady=(0, 2))
-        tk.Label(ctrl_card, text="※ デフォルトのホットキーは F2（Fn+F2）です。F2で録音開始、もう一度F2で停止します。",
+        tk.Label(ctrl_card, text=t("settings_hotkey_note", L),
                  font=("Segoe UI", 8), fg="#888888", bg=CARD_COLOR, wraplength=450,
                  justify="left").pack(anchor="w", pady=(0, 6))
 
         row1 = tk.Frame(ctrl_card, bg=CARD_COLOR)
         row1.pack(fill="x", pady=(0, 6))
 
-        tk.Label(row1, text="ホットキー:", font=("Segoe UI", 10),
+        tk.Label(row1, text=t("settings_hotkey", L), font=("Segoe UI", 10),
                  fg=TEXT_COLOR, bg=CARD_COLOR).pack(side="left")
         hotkey_var = tk.StringVar(value=config.get("hotkey", "f2"))
         tk.Entry(row1, textvariable=hotkey_var, width=12,
                  bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
                  relief="flat", font=("Consolas", 10)).pack(side="left", padx=(5, 20))
 
-        tk.Label(row1, text="言語:", font=("Segoe UI", 10),
+        tk.Label(row1, text=t("settings_language", L), font=("Segoe UI", 10),
                  fg=TEXT_COLOR, bg=CARD_COLOR).pack(side="left")
         lang_var = tk.StringVar(value=config.get("language", "ja"))
         ttk.Combobox(row1, textvariable=lang_var,
@@ -168,12 +167,12 @@ class SettingsGUI:
                      style="Dark.TCombobox").pack(side="left", padx=(5, 0))
 
         mode_var = tk.StringVar(value=config.get("mode", "toggle"))
-        tk.Radiobutton(ctrl_card, text="Toggle（1回押して開始、もう1回で停止）",
+        tk.Radiobutton(ctrl_card, text=t("settings_mode_toggle", L),
                        variable=mode_var, value="toggle",
                        fg=TEXT_COLOR, bg=CARD_COLOR, selectcolor=ACCENT_COLOR,
                        activebackground=CARD_COLOR, activeforeground=TEXT_COLOR,
                        font=("Segoe UI", 9)).pack(anchor="w")
-        tk.Radiobutton(ctrl_card, text="Push-to-Talk（キーを押している間だけ録音）",
+        tk.Radiobutton(ctrl_card, text=t("settings_mode_ptt", L),
                        variable=mode_var, value="push_to_talk",
                        fg=TEXT_COLOR, bg=CARD_COLOR, selectcolor=ACCENT_COLOR,
                        activebackground=CARD_COLOR, activeforeground=TEXT_COLOR,

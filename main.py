@@ -42,6 +42,7 @@ def show_error(title, message):
 
 try:
     from settings_manager import load_config, save_config, CONFIG_PATH
+    from i18n import t
     from recorder import AudioRecorder
     from transcriber import Transcriber
     from text_inserter import TextInserter
@@ -92,8 +93,10 @@ class VoiceToTextApp:
         import threading
         threading.Thread(target=self._preload_vad, daemon=True).start()
 
+        lang = self.config.get("language", "ja")
+
         # Initialize overlay
-        self.overlay = RecordingOverlay(on_gemini_toggle=self._toggle_gemini_cleanup)
+        self.overlay = RecordingOverlay(on_gemini_toggle=self._toggle_gemini_cleanup, lang=lang)
         self.overlay.start()
         self.overlay.set_gemini_state(self.config.get("use_gemini_cleanup", False))
 
@@ -114,6 +117,7 @@ class VoiceToTextApp:
             on_quit=self._quit,
             on_mode_toggle=self._toggle_mode,
             on_gemini_toggle=self._toggle_gemini_cleanup,
+            lang=lang,
         )
         self.tray.set_mode(self.config.get("mode", "push_to_talk"))
         self.tray.set_gemini_cleanup(self.config.get("use_gemini_cleanup", False))
@@ -127,7 +131,12 @@ class VoiceToTextApp:
     def _prompt_api_key(self) -> bool:
         """Show a welcome dialog to enter API keys on first run."""
         import webbrowser
+        import locale
         result = {"groq_key": "", "gemini_key": ""}
+
+        # Detect system language for initial UI
+        sys_lang = locale.getdefaultlocale()[0] or ""
+        L = "ja" if sys_lang.startswith("ja") else "en"
 
         BG = "#1a1a2e"
         CARD = "#16213e"
@@ -159,25 +168,25 @@ class VoiceToTextApp:
         main.pack(fill="both", expand=True)
 
         # Title
-        tk.Label(main, text="Voice to Text", font=("Segoe UI", 22, "bold"),
+        tk.Label(main, text=t("setup_title", L), font=("Segoe UI", 22, "bold"),
                  fg="#FFFFFF", bg=BG).pack(pady=(0, 3))
-        tk.Label(main, text="どのアプリでも声でテキスト入力", font=("Segoe UI", 10),
+        tk.Label(main, text=t("setup_subtitle", L), font=("Segoe UI", 10),
                  fg="#888888", bg=BG).pack(pady=(0, 15))
 
-        # === Groq Card (必須) ===
+        # === Groq Card ===
         groq_card = tk.Frame(main, bg=CARD, padx=15, pady=12)
         groq_card.pack(fill="x", pady=(0, 10))
 
         groq_header = tk.Frame(groq_card, bg=CARD)
         groq_header.pack(fill="x", pady=(0, 5))
-        tk.Label(groq_header, text="Groq API Key（必須・無料）", font=("Segoe UI", 11, "bold"),
+        tk.Label(groq_header, text=t("setup_groq_title", L), font=("Segoe UI", 11, "bold"),
                  fg=HIGHLIGHT, bg=CARD).pack(side="left")
-        groq_link = tk.Label(groq_header, text="取得する", font=("Segoe UI", 9, "underline"),
+        groq_link = tk.Label(groq_header, text=t("setup_groq_link", L), font=("Segoe UI", 9, "underline"),
                              fg=HIGHLIGHT, bg=CARD, cursor="hand2")
         groq_link.pack(side="right")
         groq_link.bind("<Button-1>", lambda e: webbrowser.open("https://console.groq.com/keys"))
 
-        tk.Label(groq_card, text="音声認識エンジン（14,400回/日まで無料）", font=("Segoe UI", 9),
+        tk.Label(groq_card, text=t("setup_groq_desc", L), font=("Segoe UI", 9),
                  fg="#888888", bg=CARD).pack(anchor="w", pady=(0, 5))
 
         groq_var = tk.StringVar()
@@ -187,23 +196,23 @@ class VoiceToTextApp:
         groq_entry.pack(fill="x", pady=(0, 5))
         groq_entry.focus_set()
 
-        tk.Label(groq_card, text="1. Groqにサインアップ → 2. API Keys → 3. Create API Key",
+        tk.Label(groq_card, text=t("setup_groq_steps", L),
                  font=("Segoe UI", 8), fg="#666666", bg=CARD).pack(anchor="w")
 
-        # === Gemini Card (オプション) ===
+        # === Gemini Card ===
         gemini_card = tk.Frame(main, bg=CARD, padx=15, pady=12)
         gemini_card.pack(fill="x", pady=(0, 10))
 
         gemini_header = tk.Frame(gemini_card, bg=CARD)
         gemini_header.pack(fill="x", pady=(0, 5))
-        tk.Label(gemini_header, text="Gemini API Key（オプション）", font=("Segoe UI", 11, "bold"),
+        tk.Label(gemini_header, text=t("setup_gemini_title", L), font=("Segoe UI", 11, "bold"),
                  fg="#FFA726", bg=CARD).pack(side="left")
-        gemini_link = tk.Label(gemini_header, text="取得する", font=("Segoe UI", 9, "underline"),
+        gemini_link = tk.Label(gemini_header, text=t("setup_groq_link", L), font=("Segoe UI", 9, "underline"),
                                fg=HIGHLIGHT, bg=CARD, cursor="hand2")
         gemini_link.pack(side="right")
         gemini_link.bind("<Button-1>", lambda e: webbrowser.open("https://aistudio.google.com/apikey"))
 
-        tk.Label(gemini_card, text="文章整形AI（句読点・改行を自動整形、月約150円）", font=("Segoe UI", 9),
+        tk.Label(gemini_card, text=t("setup_gemini_desc", L), font=("Segoe UI", 9),
                  fg="#888888", bg=CARD).pack(anchor="w", pady=(0, 5))
 
         gemini_var = tk.StringVar()
@@ -212,7 +221,7 @@ class VoiceToTextApp:
                                 relief="flat", font=("Consolas", 10))
         gemini_entry.pack(fill="x", pady=(0, 5))
 
-        tk.Label(gemini_card, text="空欄でもOK（後から設定画面で追加できます）",
+        tk.Label(gemini_card, text=t("setup_gemini_optional", L),
                  font=("Segoe UI", 8), fg="#666666", bg=CARD).pack(anchor="w")
 
         # === Buttons ===
@@ -222,7 +231,7 @@ class VoiceToTextApp:
         def on_save():
             key = groq_var.get().strip()
             if not key:
-                messagebox.showwarning("Warning", "Groq API Key を入力してください!", parent=root)
+                messagebox.showwarning("Warning", t("setup_groq_required", L), parent=root)
                 return
             result["groq_key"] = key
             result["gemini_key"] = gemini_var.get().strip()
@@ -231,12 +240,12 @@ class VoiceToTextApp:
         def on_cancel():
             root.destroy()
 
-        save_btn = tk.Button(btn_frame, text="はじめる", font=("Segoe UI", 12, "bold"),
+        save_btn = tk.Button(btn_frame, text=t("setup_start", L), font=("Segoe UI", 12, "bold"),
                              fg="#FFFFFF", bg=GREEN, activebackground="#388E3C",
                              relief="flat", padx=30, pady=5, cursor="hand2",
                              command=on_save)
         save_btn.pack(side="left", padx=5)
-        cancel_btn = tk.Button(btn_frame, text="キャンセル", font=("Segoe UI", 10),
+        cancel_btn = tk.Button(btn_frame, text=t("setup_cancel", L), font=("Segoe UI", 10),
                                fg="#888888", bg="#333333", activebackground="#444444",
                                relief="flat", padx=15, pady=5, cursor="hand2",
                                command=on_cancel)
@@ -275,11 +284,12 @@ class VoiceToTextApp:
 
     def _on_recording_start(self):
         log.info("Recording started...")
+        L = self.config.get("language", "ja")
         self.recorder.start()
         if self.tray:
             self.tray.set_recording(True)
         if self.overlay:
-            self.overlay.show("Recording...")
+            self.overlay.show(t("recording", L))
 
     def _on_recording_stop(self):
         log.info("Recording stopped. Processing...")
@@ -289,7 +299,7 @@ class VoiceToTextApp:
         if self.tray:
             self.tray.set_processing()
         if self.overlay:
-            self.overlay.update_text("Processing...")
+            self.overlay.update_text(t("processing", self.config.get("language", "ja")))
 
         if not wav_data or duration < 0.3:
             log.info("Recording too short, skipping.")
@@ -309,7 +319,7 @@ class VoiceToTextApp:
         except Exception as e:
             log.error(f"Transcription error: {e}")
             if self.overlay:
-                self.overlay.update_text("Error!")
+                self.overlay.update_text(t("error", self.config.get("language", "ja")))
                 import time
                 time.sleep(1)
         finally:

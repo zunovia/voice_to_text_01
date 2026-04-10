@@ -1,6 +1,7 @@
 import tkinter as tk
 import threading
 import collections
+from i18n import t
 
 
 class RecordingOverlay:
@@ -13,7 +14,7 @@ class RecordingOverlay:
     BG_COLOR = "#1E1E1E"
     BAR_COUNT = 40
 
-    def __init__(self, on_gemini_toggle=None):
+    def __init__(self, on_gemini_toggle=None, lang="ja"):
         self._root = None
         self._canvas = None
         self._label = None
@@ -26,6 +27,7 @@ class RecordingOverlay:
         self._animating = False
         self._gemini_on = False
         self._on_gemini_toggle = on_gemini_toggle
+        self._lang = lang
 
     def start(self):
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -126,13 +128,13 @@ class RecordingOverlay:
         if self._gemini_btn:
             if self._gemini_on:
                 self._gemini_btn.config(
-                    text="Gemini ON",
+                    text=t("gemini_on", self._lang),
                     fg="#FFFFFF",
                     bg="#4CAF50",
                 )
             else:
                 self._gemini_btn.config(
-                    text="Gemini OFF",
+                    text=t("gemini_off", self._lang),
                     fg="#999999",
                     bg="#333333",
                 )

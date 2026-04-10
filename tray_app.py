@@ -5,6 +5,7 @@ import os
 import pystray
 from autostart import is_autostart_enabled, enable_autostart, disable_autostart
 from PIL import Image, ImageDraw
+from i18n import t
 
 
 def _create_icon(color: str = "green", size: int = 64) -> Image.Image:
@@ -40,7 +41,7 @@ def _create_icon(color: str = "green", size: int = 64) -> Image.Image:
 
 
 class TrayApp:
-    def __init__(self, on_settings=None, on_quit=None, on_mode_toggle=None, on_gemini_toggle=None):
+    def __init__(self, on_settings=None, on_quit=None, on_mode_toggle=None, on_gemini_toggle=None, lang="ja"):
         self.on_settings = on_settings or (lambda: None)
         self.on_quit = on_quit or (lambda: None)
         self.on_mode_toggle = on_mode_toggle or (lambda: None)
@@ -51,43 +52,39 @@ class TrayApp:
         self._icon_processing = _create_icon("orange")
         self._icon = None
         self._current_mode = "push_to_talk"
-
-    def _get_mode_text(self):
-        if self._current_mode == "push_to_talk":
-            return "Push-to-Talk (Ctrl+Shift+Space を押しながら話す)"
-        else:
-            return "Toggle (Ctrl+Shift+Space で開始/停止)"
+        self._lang = lang
 
     def start(self):
+        L = self._lang
         menu = pystray.Menu(
-            pystray.MenuItem("Voice-to-Text", None, enabled=False),
+            pystray.MenuItem(t("tray_app_name", L), None, enabled=False),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                lambda item: f"使い方: {self._get_mode_text()}",
+                lambda item: t("tray_usage_ptt" if self._current_mode == "push_to_talk" else "tray_usage_toggle", self._lang),
                 None,
                 enabled=False,
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                lambda item: f"モード切替 (現在: {'Push-to-Talk' if self._current_mode == 'push_to_talk' else 'Toggle'})",
+                lambda item: f"{t('tray_mode_switch', self._lang)} ({t('tray_mode_ptt' if self._current_mode == 'push_to_talk' else 'tray_mode_toggle', self._lang)})",
                 self._toggle_mode,
             ),
             pystray.MenuItem(
-                lambda item: f"Gemini文章整形: {'ON (高精度)' if self._gemini_cleanup else 'OFF (高速)'}",
+                lambda item: t("tray_gemini_on" if self._gemini_cleanup else "tray_gemini_off", self._lang),
                 self._toggle_gemini,
             ),
-            pystray.MenuItem("設定を開く", self._open_settings),
+            pystray.MenuItem(lambda item: t("tray_settings", self._lang), self._open_settings),
             pystray.MenuItem(
-                lambda item: f"自動起動: {'ON' if is_autostart_enabled() else 'OFF'}",
+                lambda item: t("tray_autostart_on" if is_autostart_enabled() else "tray_autostart_off", self._lang),
                 self._toggle_autostart,
             ),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("終了", self._quit),
+            pystray.MenuItem(lambda item: t("tray_quit", self._lang), self._quit),
         )
         self._icon = pystray.Icon(
             "voice_to_text",
             self._icon_normal,
-            "Voice-to-Text\nCtrl+Shift+Space で録音",
+            t("tray_ready", L),
             menu,
         )
         self._icon.run()
@@ -96,15 +93,15 @@ class TrayApp:
         if self._icon:
             if recording:
                 self._icon.icon = self._icon_recording
-                self._icon.title = "Voice-to-Text [録音中...]"
+                self._icon.title = t("tray_recording", self._lang)
             else:
                 self._icon.icon = self._icon_normal
-                self._icon.title = "Voice-to-Text\nCtrl+Shift+Space で録音"
+                self._icon.title = t("tray_ready", self._lang)
 
     def set_processing(self):
         if self._icon:
             self._icon.icon = self._icon_processing
-            self._icon.title = "Voice-to-Text [変換中...]"
+            self._icon.title = t("tray_processing", self._lang)
 
     def set_mode(self, mode: str):
         self._current_mode = mode
