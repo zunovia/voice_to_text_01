@@ -1,24 +1,32 @@
 import json
 import os
 import sys
+import logging
+
+log = logging.getLogger("VoiceToText")
 
 
 def _get_app_dir() -> str:
     """Get the directory where config/log files should be stored.
-    For exe: the directory containing the exe.
-    For script: the directory containing main.py.
+    For exe (frozen): directory containing the exe file.
+    For script: directory containing this .py file.
     """
     if getattr(sys, "frozen", False):
+        # PyInstaller exe - use exe's directory
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 
 
-CONFIG_PATH = os.path.join(_get_app_dir(), "config.json")
+APP_DIR = _get_app_dir()
+CONFIG_PATH = os.path.join(APP_DIR, "config.json")
+
 
 DEFAULT_CONFIG = {
     "api_key": "",
+    "gemini_api_key": "",
+    "use_gemini_cleanup": False,
     "hotkey": "f2",
-    "mode": "toggle",  # "push_to_talk" or "toggle"
+    "mode": "toggle",
     "language": "ja",
     "sample_rate": 16000,
     "voice_commands": {
@@ -34,29 +42,51 @@ DEFAULT_CONFIG = {
         "かっことじ": "）",
         "かぎかっこ": "「",
         "かぎかっことじ": "」",
+        "鉤括弧": "「",
+        "鉤括弧閉じ": "」",
+        "カギカッコ": "「",
+        "カギカッコトジ": "」",
+        "すみかっこ": "【",
+        "すみかっことじ": "】",
         "タブ": "\t",
         "スペース": " ",
+        "とうてん": "、",
+        "くてん": "。",
     },
 }
 
 
 def load_config() -> dict:
+    log.debug(f"Loading config from: {CONFIG_PATH}")
     if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        # Merge with defaults for any missing keys
-        merged = {**DEFAULT_CONFIG, **config}
-        merged["voice_commands"] = {
-            **DEFAULT_CONFIG["voice_commands"],
-            **config.get("voice_commands", {}),
-        }
-        return merged
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                config = json.load(f)
+            merged = {**DEFAULT_CONFIG, **config}
+            merged["voice_commands"] = {
+                **DEFAULT_CONFIG["voice_commands"],
+                **config.get("voice_commands", {}),
+            }
+            return merged
+        except Exception as e:
+            log.error(f"Failed to load config: {e}")
     return DEFAULT_CONFIG.copy()
 
 
-def save_config(config: dict):
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+def save_config(config: dict) -> bool:
+    try:
+        # Ensure directory exists
+        config_dir = os.path.dirname(CONFIG_PATH)
+        if config_dir and not os.path.exists(config_dir):
+            os.makedirs(config_dir, exist_ok=True)
+
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        log.info(f"Config saved to: {CONFIG_PATH}")
+        return True
+    except Exception as e:
+        log.error(f"Failed to save config to {CONFIG_PATH}: {e}")
+        return False
 
 
 def get_api_key() -> str:

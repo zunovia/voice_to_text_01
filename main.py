@@ -41,7 +41,7 @@ def show_error(title, message):
 
 
 try:
-    from settings_manager import load_config, save_config
+    from settings_manager import load_config, save_config, CONFIG_PATH
     from recorder import AudioRecorder
     from transcriber import Transcriber
     from text_inserter import TextInserter
@@ -252,9 +252,13 @@ class VoiceToTextApp:
             if result["gemini_key"]:
                 self.config["gemini_api_key"] = result["gemini_key"]
                 self.config["use_gemini_cleanup"] = True
-            save_config(self.config)
-            log.info("API Keys saved successfully.")
-            return True
+            success = save_config(self.config)
+            if success:
+                log.info(f"API Keys saved to {CONFIG_PATH}")
+            else:
+                log.error(f"FAILED to save API Keys to {CONFIG_PATH}")
+                show_error("Voice to Text", f"設定の保存に失敗しました。\n保存先: {CONFIG_PATH}\n\n書き込み権限を確認してください。")
+            return success
         return False
 
     def _setup_hotkey(self):

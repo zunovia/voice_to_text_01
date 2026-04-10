@@ -73,9 +73,13 @@ class SettingsGUI:
             config["hotkey"] = hotkey_var.get().strip()
             config["mode"] = mode_var.get()
             config["language"] = lang_var.get()
-            save_config(config)
-            self.on_save(config)
-            root.destroy()
+            success = save_config(config)
+            if success:
+                self.on_save(config)
+                root.destroy()
+            else:
+                from settings_manager import CONFIG_PATH
+                messagebox.showerror("Error", f"設定の保存に失敗しました。\n{CONFIG_PATH}", parent=root)
 
         save_btn = tk.Button(top_bar, text=" 保存 ", font=("Segoe UI", 11, "bold"),
                              fg="#FFFFFF", bg=GREEN, activebackground="#388E3C",
