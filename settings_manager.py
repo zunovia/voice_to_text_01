@@ -20,6 +20,9 @@ def _get_app_dir() -> str:
 APP_DIR = _get_app_dir()
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
 
+# Log paths at startup for debugging
+print(f"[settings_manager] APP_DIR={APP_DIR}, CONFIG_PATH={CONFIG_PATH}, frozen={getattr(sys, 'frozen', False)}")
+
 
 DEFAULT_CONFIG = {
     "api_key": "",
@@ -82,8 +85,20 @@ def save_config(config: dict) -> bool:
 
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
-        log.info(f"Config saved to: {CONFIG_PATH}")
-        return True
+
+        # Verify save was successful
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            if saved.get("api_key") == config.get("api_key"):
+                log.info(f"Config saved and verified: {CONFIG_PATH}")
+                return True
+            else:
+                log.error(f"Config verification failed! Saved key doesn't match.")
+                return False
+        else:
+            log.error(f"Config file not found after save: {CONFIG_PATH}")
+            return False
     except Exception as e:
         log.error(f"Failed to save config to {CONFIG_PATH}: {e}")
         return False

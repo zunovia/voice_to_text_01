@@ -132,11 +132,35 @@ class VoiceToTextApp:
         """Show a welcome dialog to enter API keys on first run."""
         import webbrowser
         import locale
-        result = {"groq_key": "", "gemini_key": ""}
 
         # Detect system language for initial UI
         sys_lang = locale.getdefaultlocale()[0] or ""
-        L = "ja" if sys_lang.startswith("ja") else "en"
+        current_lang = "ja" if sys_lang.startswith("ja") else "en"
+
+        while True:
+            result_data = self._show_setup_dialog(current_lang)
+            if result_data is None:
+                # Language switched, retry with new language
+                current_lang = "en" if current_lang == "ja" else "ja"
+                continue
+            if result_data.get("groq_key"):
+                self.config["api_key"] = result_data["groq_key"]
+                self.config["language"] = current_lang
+                if result_data.get("gemini_key"):
+                    self.config["gemini_api_key"] = result_data["gemini_key"]
+                    self.config["use_gemini_cleanup"] = True
+                success = save_config(self.config)
+                if success:
+                    log.info(f"API Keys saved to {CONFIG_PATH}")
+                else:
+                    log.error(f"FAILED to save API Keys to {CONFIG_PATH}")
+                return success
+            return False
+
+    def _show_setup_dialog(self, L) -> dict | None:
+        """Show setup dialog. Returns dict with keys, or None if language switched."""
+        import webbrowser
+        result = {"groq_key": "", "gemini_key": "", "lang_switched": False}
 
         BG = "#1a1a2e"
         CARD = "#16213e"
@@ -167,11 +191,29 @@ class VoiceToTextApp:
         main = tk.Frame(root, bg=BG, padx=30, pady=15)
         main.pack(fill="both", expand=True)
 
-        # Title
-        tk.Label(main, text=t("setup_title", L), font=("Segoe UI", 22, "bold"),
-                 fg="#FFFFFF", bg=BG).pack(pady=(0, 3))
+        # Language switch + Title
+        title_row = tk.Frame(main, bg=BG)
+        title_row.pack(fill="x", pady=(0, 3))
+
+        tk.Label(title_row, text=t("setup_title", L), font=("Segoe UI", 22, "bold"),
+                 fg="#FFFFFF", bg=BG).pack(side="left")
+
+        # Language toggle button
+        lang_state = {"lang": L}
+
+        def toggle_lang():
+            result["lang_switched"] = True
+            root.destroy()
+
+        lang_btn = tk.Button(title_row, text="EN" if L == "ja" else "日本語",
+                             font=("Segoe UI", 9), fg="#FFFFFF", bg="#333333",
+                             activebackground="#444444", relief="flat",
+                             padx=8, pady=2, cursor="hand2",
+                             command=toggle_lang)
+        lang_btn.pack(side="right")
+
         tk.Label(main, text=t("setup_subtitle", L), font=("Segoe UI", 10),
-                 fg="#888888", bg=BG).pack(pady=(0, 15))
+                 fg="#888888", bg=BG).pack(anchor="w", pady=(0, 15))
 
         # === Groq Card ===
         groq_card = tk.Frame(main, bg=CARD, padx=15, pady=12)
@@ -256,19 +298,11 @@ class VoiceToTextApp:
 
         root.mainloop()
 
+        if result.get("lang_switched"):
+            return None  # Signal to retry with switched language
         if result["groq_key"]:
-            self.config["api_key"] = result["groq_key"]
-            if result["gemini_key"]:
-                self.config["gemini_api_key"] = result["gemini_key"]
-                self.config["use_gemini_cleanup"] = True
-            success = save_config(self.config)
-            if success:
-                log.info(f"API Keys saved to {CONFIG_PATH}")
-            else:
-                log.error(f"FAILED to save API Keys to {CONFIG_PATH}")
-                show_error("Voice to Text", f"設定の保存に失敗しました。\n保存先: {CONFIG_PATH}\n\n書き込み権限を確認してください。")
-            return success
-        return False
+            return result
+        return {}
 
     def _setup_hotkey(self):
         if self.hotkey_manager:
@@ -429,7 +463,8 @@ if __name__ == "__main__":
         app.run()
     except Exception as e:
         log.error(f"Fatal error: {e}", exc_info=True)
-        show_error("Voice-to-Text Error", f"Unexpected error:\n{e}")
+        # Don't show error dialog for non-critical errors during shutdown
+        # Only show if it's truly fatal (app never started)
         sys.exit(1)
     finally:
         # Clean up lock file
