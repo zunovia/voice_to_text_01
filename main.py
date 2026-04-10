@@ -365,11 +365,7 @@ class VoiceToTextApp:
     def _show_settings(self):
         def _show():
             try:
-                if not self._tk_root:
-                    self._tk_root = tk.Tk()
-                    self._tk_root.withdraw()
                 self.settings_gui.show()
-                self._tk_root.mainloop()
             except Exception as e:
                 log.error(f"Settings GUI error: {e}")
 

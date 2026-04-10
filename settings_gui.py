@@ -3,9 +3,11 @@ from tkinter import ttk, messagebox
 import webbrowser
 import os
 import sys
-from settings_manager import load_config, save_config
+import logging
+from settings_manager import load_config, save_config, CONFIG_PATH
 from i18n import t
 
+log = logging.getLogger("VoiceToText")
 
 BG_COLOR = "#1a1a2e"
 CARD_COLOR = "#16213e"
@@ -28,18 +30,19 @@ class SettingsGUI:
     def show(self):
         config = load_config()
         L = config.get("language", "ja")
+        log.info(f"Settings GUI opening. CONFIG_PATH={CONFIG_PATH}, api_key={'set' if config.get('api_key') else 'empty'}")
 
         root = tk.Tk()
         root.title("Voice to Text - Settings")
-        root.geometry("520x640")
+        root.geometry("520x660")
         root.resizable(False, False)
         root.attributes("-topmost", True)
         root.configure(bg=BG_COLOR)
 
         root.update_idletasks()
         x = (root.winfo_screenwidth() - 520) // 2
-        y = (root.winfo_screenheight() - 640) // 2
-        root.geometry(f"520x640+{x}+{y}")
+        y = (root.winfo_screenheight() - 660) // 2
+        root.geometry(f"520x660+{x}+{y}")
         root.lift()
         root.focus_force()
 
@@ -54,32 +57,36 @@ class SettingsGUI:
         style.theme_use("clam")
         style.configure("Dark.TCombobox", fieldbackground="#2a2a4a", foreground="#000000")
 
-        # === Top bar (fixed) with save button ===
+        # === Top bar with save button ===
         top_bar = tk.Frame(root, bg="#111122", pady=8)
         top_bar.pack(side="top", fill="x")
 
         tk.Label(top_bar, text=t("settings_title", L), font=("Segoe UI", 14, "bold"),
                  fg="#FFFFFF", bg="#111122").pack(side="left", padx=(15, 0))
 
-        status_var = tk.StringVar(value="")
-
         def on_save():
             api_key = groq_var.get().strip()
             if not api_key:
                 messagebox.showwarning("Warning", t("settings_groq_required", L), parent=root)
                 return
+
+            # Update config
             config["api_key"] = api_key
             config["gemini_api_key"] = gemini_var.get().strip()
             config["use_gemini_cleanup"] = gemini_cleanup_var.get()
             config["hotkey"] = hotkey_var.get().strip()
             config["mode"] = mode_var.get()
             config["language"] = lang_var.get()
+
+            log.info(f"Saving config: api_key={'set' if api_key else 'empty'}, path={CONFIG_PATH}")
+
             success = save_config(config)
             if success:
+                log.info("Settings saved successfully")
                 self.on_save(config)
                 root.destroy()
             else:
-                from settings_manager import CONFIG_PATH
+                log.error("Settings save FAILED")
                 messagebox.showerror("Error", f"{t('settings_save_failed', L)}\n{CONFIG_PATH}", parent=root)
 
         save_btn = tk.Button(top_bar, text=t("settings_save", L), font=("Segoe UI", 11, "bold"),
@@ -87,10 +94,6 @@ class SettingsGUI:
                              relief="flat", padx=15, pady=3, cursor="hand2",
                              command=on_save)
         save_btn.pack(side="right", padx=(0, 15))
-
-        status_label = tk.Label(top_bar, textvariable=status_var, font=("Segoe UI", 9),
-                                fg=GREEN, bg="#111122")
-        status_label.pack(side="right", padx=(0, 10))
 
         # === Main content ===
         main = tk.Frame(root, bg=BG_COLOR, padx=20, pady=10)
@@ -114,9 +117,10 @@ class SettingsGUI:
         groq_link.bind("<Button-1>", lambda e: webbrowser.open("https://console.groq.com/keys"))
 
         groq_var = tk.StringVar(value=config.get("api_key", ""))
-        tk.Entry(api_card, textvariable=groq_var, width=55, show="*",
-                 bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
-                 relief="flat", font=("Consolas", 10)).pack(fill="x", pady=(0, 8))
+        groq_entry = tk.Entry(api_card, textvariable=groq_var, width=55, show="*",
+                              bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
+                              relief="flat", font=("Consolas", 10))
+        groq_entry.pack(fill="x", pady=(0, 8))
 
         # Gemini
         gemini_frame = tk.Frame(api_card, bg=CARD_COLOR)
@@ -129,9 +133,10 @@ class SettingsGUI:
         gemini_link.bind("<Button-1>", lambda e: webbrowser.open("https://aistudio.google.com/apikey"))
 
         gemini_var = tk.StringVar(value=config.get("gemini_api_key", ""))
-        tk.Entry(api_card, textvariable=gemini_var, width=55, show="*",
-                 bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
-                 relief="flat", font=("Consolas", 10)).pack(fill="x", pady=(0, 6))
+        gemini_entry = tk.Entry(api_card, textvariable=gemini_var, width=55, show="*",
+                                bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
+                                relief="flat", font=("Consolas", 10))
+        gemini_entry.pack(fill="x", pady=(0, 6))
 
         gemini_cleanup_var = tk.BooleanVar(value=config.get("use_gemini_cleanup", False))
         tk.Checkbutton(api_card, text=t("settings_gemini_check", L),
@@ -162,9 +167,10 @@ class SettingsGUI:
         tk.Label(row1, text=t("settings_language", L), font=("Segoe UI", 10),
                  fg=TEXT_COLOR, bg=CARD_COLOR).pack(side="left")
         lang_var = tk.StringVar(value=config.get("language", "ja"))
-        ttk.Combobox(row1, textvariable=lang_var,
-                     values=["ja", "en", "zh", "ko"], width=5, state="readonly",
-                     style="Dark.TCombobox").pack(side="left", padx=(5, 0))
+        lang_combo = ttk.Combobox(row1, textvariable=lang_var,
+                                   values=["ja", "en", "zh", "ko"], width=5, state="readonly",
+                                   style="Dark.TCombobox")
+        lang_combo.pack(side="left", padx=(5, 0))
 
         mode_var = tk.StringVar(value=config.get("mode", "toggle"))
         tk.Radiobutton(ctrl_card, text=t("settings_mode_toggle", L),
@@ -177,6 +183,12 @@ class SettingsGUI:
                        fg=TEXT_COLOR, bg=CARD_COLOR, selectcolor=ACCENT_COLOR,
                        activebackground=CARD_COLOR, activeforeground=TEXT_COLOR,
                        font=("Segoe UI", 9)).pack(anchor="w")
+
+        # === Info bar ===
+        info = tk.Frame(main, bg=BG_COLOR)
+        info.pack(fill="x", pady=(5, 0))
+        tk.Label(info, text=f"Config: {CONFIG_PATH}", font=("Segoe UI", 7),
+                 fg="#555555", bg=BG_COLOR).pack(anchor="w")
 
         root.protocol("WM_DELETE_WINDOW", root.destroy)
         root.mainloop()
