@@ -34,6 +34,15 @@ class HotkeyManager:
             self._listener.stop()
             self._listener = None
 
+    def trigger(self):
+        """Toggle recording from button click (always toggle, even in push_to_talk mode)."""
+        if not self._is_active:
+            self._is_active = True
+            threading.Thread(target=self.on_start, daemon=True).start()
+        else:
+            self._is_active = False
+            threading.Thread(target=self.on_stop, daemon=True).start()
+
     def update_hotkey(self, hotkey_str: str):
         self._hotkey_keys = self._parse_hotkey(hotkey_str)
 

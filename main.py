@@ -106,7 +106,13 @@ class VoiceToTextApp:
         lang = self.config.get("language", "ja")
 
         # Initialize overlay
-        self.overlay = RecordingOverlay(on_gemini_toggle=self._toggle_gemini_cleanup, lang=lang)
+        hotkey_label = self._format_hotkey_label(self.config.get("hotkey", "ctrl+shift+space"))
+        self.overlay = RecordingOverlay(
+            on_gemini_toggle=self._toggle_gemini_cleanup,
+            lang=lang,
+            on_button_click=self._on_button_click,
+            hotkey_label=hotkey_label,
+        )
         self.overlay.start()
         self.overlay.set_gemini_state(self.config.get("use_gemini_cleanup", False))
 
@@ -319,6 +325,15 @@ class VoiceToTextApp:
             return result
         return {}
 
+    def _on_button_click(self):
+        if self.hotkey_manager:
+            self.hotkey_manager.trigger()
+
+    @staticmethod
+    def _format_hotkey_label(hotkey_str: str) -> str:
+        parts = hotkey_str.strip().split("+")
+        return "+".join(p.strip().upper() for p in parts)
+
     def _setup_hotkey(self):
         if self.hotkey_manager:
             self.hotkey_manager.stop()
@@ -394,6 +409,10 @@ class VoiceToTextApp:
         self._setup_hotkey()
         if self.tray:
             self.tray.set_mode(new_config.get("mode", "push_to_talk"))
+        if self.overlay:
+            self.overlay.update_button_label(
+                self._format_hotkey_label(new_config.get("hotkey", "ctrl+shift+space"))
+            )
         log.info(f"Settings updated. Hotkey: {new_config['hotkey']}, Mode: {new_config['mode']}")
 
     def _preload_vad(self):

@@ -15,6 +15,7 @@ AQUA Voice にインスパイアされた音声入力デスクトップアプリ
 - **日本語最適化** - 高精度な日本語認識と句読点
 - **音声コマンド** - 「エンター」で改行、「まる」で句点など
 - **トグル方式** - F2で録音開始、もう一度押して停止
+- **フローティングボタン** - 画面右下に常時表示。マイク(録音ON/OFF) + Enterボタン付き。ドラッグで移動可能
 - **システムトレイ常駐** - バックグラウンドで静かに動作
 - **波形オーバーレイ** - 録音中にリアルタイム波形表示
 - **クロスプラットフォーム** - Windows / macOS 対応
@@ -53,6 +54,17 @@ python main.py
 - **F2**（またはFn+F2）を押す → 録音開始
 - 話す
 - **F2** をもう一度押す → 録音停止 → テキスト変換 → カーソル位置に挿入
+
+#### フローティングボタン
+
+画面右下にフローティングボタンが常時表示されます。どの画面でも見やすいグローリング付きデザインです。
+
+- **マイクボタン** (上) → クリックで録音開始/停止（F2キーと同じ動作）
+- **Enterボタン** (下) → クリックでEnterキーを送信（チャット送信などに便利）
+- **ドラッグ** → 両ボタンまとめて好きな位置に移動
+- 録音中はボタンとリングが **赤色** に変化
+- ホットキーを設定画面で変更するとボタンのラベルも自動更新
+- ボタンクリック時にフォーカスは奪われないため、テキスト入力中でも安心して使えます
 
 ### 音声コマンド
 
@@ -106,6 +118,18 @@ build.bat
 3. `config.json` にAPIキーを入力
 4. デスクトップの「Voice to Text」をダブルクリック
 
+### Windows SmartScreen の警告について
+
+初回起動時に「WindowsによってPCが保護されました」という青い画面が表示されることがあります。これはコード署名されていないアプリに対するWindowsの標準的な警告で、アプリ自体に問題があるわけではありません。
+
+**回避手順:**
+
+1. 青い画面で **「詳細情報」** をクリック
+2. **「実行」** ボタンが表示されるのでクリック
+3. 次回以降は表示されません
+
+> このアプリはオープンソースです。ソースコードはすべて公開されており、安全性を確認できます。
+
 ### システムトレイメニュー
 
 トレイアイコンを右クリック:
@@ -127,6 +151,7 @@ AQUA Voice inspired voice-to-text desktop application. Press a hotkey, speak, an
 - **Japanese optimized** - Excellent Japanese recognition with punctuation
 - **Voice commands** - Say "enter" for newline, "period" for punctuation
 - **Toggle mode** - Press F2 to start recording, press again to stop
+- **Floating button** - Always-on-screen mic + Enter buttons with glow ring. Drag to reposition
 - **System tray** - Runs quietly in the background
 - **Recording overlay** - Waveform visualization while recording
 - **Cross-platform** - Windows and macOS
@@ -165,6 +190,17 @@ On first launch, enter your Groq API Key in the setup dialog.
 - **F2** (or Fn+F2) - Toggle recording on/off
 - Speak naturally
 - Text is inserted at cursor position
+
+#### Floating Button
+
+A floating button panel appears at the bottom-right of your screen, visible on any background thanks to a glow ring design.
+
+- **Mic button** (top) - Click to start/stop recording (same as F2)
+- **Enter button** (bottom) - Click to send Enter key (useful for sending chat messages)
+- **Drag** - Move both buttons together anywhere on screen
+- Button and ring turn **red** while recording
+- Hotkey label updates automatically when changed in settings
+- Clicking the buttons does **not** steal focus from your active app
 
 ### Voice Commands
 
@@ -217,6 +253,18 @@ Output: `dist/VoiceToText.exe`
 2. Run `install.bat` to create desktop shortcut "Voice to Text"
 3. Edit `config.json` with your API key
 4. Double-click "Voice to Text" on desktop
+
+### Windows SmartScreen Warning
+
+On first launch you may see a blue "Windows protected your PC" screen. This is a standard Windows warning for unsigned apps and does not mean there is anything wrong with the application.
+
+**How to proceed:**
+
+1. Click **"More info"** on the blue screen
+2. Click the **"Run anyway"** button
+3. The warning will not appear again after this
+
+> This app is open source. All source code is publicly available for review.
 
 ### System Tray Menu
 
