@@ -20,7 +20,18 @@ AQUA Voice にインスパイアされた音声入力デスクトップアプリ
 - **波形オーバーレイ** - 録音中にリアルタイム波形表示
 - **クロスプラットフォーム** - Windows / macOS 対応
 
-### クイックスタート
+### インストール（exe版・推奨）
+
+1. [Releases](https://github.com/zunovia/voice_to_text_01/releases) から **VoiceToText-v2.0.0.zip** をダウンロード
+2. ZIPを任意のフォルダに展開
+3. `install.bat` をダブルクリックで実行
+4. デスクトップに「Voice to Text」ショートカットが作成されます
+5. ショートカットをダブルクリックで起動
+6. 初回起動時にGroq API Keyの入力画面が表示されます（取得方法は下記参照）
+
+> **SmartScreenの警告が出た場合:** 「詳細情報」→「実行」をクリックしてください（初回のみ）
+
+### クイックスタート（ソースから実行）
 
 #### 1. Python 3.10+ をインストール
 
@@ -155,7 +166,18 @@ AQUA Voice inspired voice-to-text desktop application. Press a hotkey, speak, an
 - **Recording overlay** - Waveform visualization while recording
 - **Cross-platform** - Windows and macOS
 
-### Quick Start
+### Install (exe version - Recommended)
+
+1. Download **VoiceToText-v2.0.0.zip** from [Releases](https://github.com/zunovia/voice_to_text_01/releases)
+2. Extract the ZIP to any folder
+3. Double-click `install.bat` to run
+4. A "Voice to Text" shortcut will be created on your desktop
+5. Double-click the shortcut to launch
+6. On first launch, enter your Groq API Key in the setup dialog (see below)
+
+> **If SmartScreen warning appears:** Click "More info" → "Run anyway" (first time only)
+
+### Quick Start (from source)
 
 #### 1. Install Python 3.10+
 
