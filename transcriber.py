@@ -84,8 +84,8 @@ class Transcriber:
             },
         }
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={self.gemini_api_key}"
-        resp = self._http.post(url, json=body)
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+        resp = self._http.post(url, params={"key": self.gemini_api_key}, json=body)
         resp.raise_for_status()
 
         candidates = resp.json().get("candidates", [])
@@ -100,9 +100,14 @@ class Transcriber:
         self.api_key = api_key
         self._groq = Groq(api_key=api_key)
 
-    def __del__(self):
-        try:
-            if self._http:
+    def close(self):
+        """Explicitly close the HTTP client to release connection pool."""
+        if self._http:
+            try:
                 self._http.close()
-        except Exception:
-            pass
+            except Exception:
+                pass
+            self._http = None
+
+    def __del__(self):
+        self.close()

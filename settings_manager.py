@@ -8,12 +8,14 @@ log = logging.getLogger("VoiceToText")
 
 def _get_app_dir() -> str:
     """Get the directory where config/log files should be stored.
-    For exe (frozen): directory containing the exe file.
+    For exe (frozen): %APPDATA%/VoiceToText/ (persists across reinstalls).
     For script: directory containing this .py file.
     """
     if getattr(sys, "frozen", False):
-        # PyInstaller exe - use exe's directory
-        return os.path.dirname(sys.executable)
+        appdata = os.environ.get("LOCALAPPDATA", os.environ.get("APPDATA", os.path.expanduser("~")))
+        data_dir = os.path.join(appdata, "VoiceToText")
+        os.makedirs(data_dir, exist_ok=True)
+        return data_dir
     return os.path.dirname(os.path.abspath(__file__))
 
 
@@ -21,7 +23,7 @@ APP_DIR = _get_app_dir()
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
 
 # Log paths at startup for debugging
-print(f"[settings_manager] APP_DIR={APP_DIR}, CONFIG_PATH={CONFIG_PATH}, frozen={getattr(sys, 'frozen', False)}")
+log.info(f"APP_DIR={APP_DIR}, CONFIG_PATH={CONFIG_PATH}, frozen={getattr(sys, 'frozen', False)}")
 
 
 DEFAULT_CONFIG = {

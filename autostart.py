@@ -5,7 +5,7 @@ import logging
 log = logging.getLogger("VoiceToText")
 
 STARTUP_FOLDER = os.path.join(
-    os.environ.get("APPDATA", ""),
+    os.environ.get("APPDATA", os.path.expanduser("~")),
     "Microsoft", "Windows", "Start Menu", "Programs", "Startup",
 )
 SHORTCUT_NAME = "VoiceToText.vbs"

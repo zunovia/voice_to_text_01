@@ -7,11 +7,29 @@ from tkinter import ttk, messagebox
 
 # Setup logging to file (essential for pythonw where there's no console)
 def _get_app_dir():
+    """Get the data directory for config/log files.
+    For exe (frozen): %APPDATA%/VoiceToText/ (persists across reinstalls).
+    For script: directory containing this .py file.
+    """
     if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
+        appdata = os.environ.get("LOCALAPPDATA", os.environ.get("APPDATA", os.path.expanduser("~")))
+        data_dir = os.path.join(appdata, "VoiceToText")
+        os.makedirs(data_dir, exist_ok=True)
+        return data_dir
     return os.path.dirname(os.path.abspath(__file__))
 
 APP_DIR = _get_app_dir()
+
+def _get_resource_dir():
+    """Get the directory containing bundled assets (icons, etc.).
+    For frozen exe: sys._MEIPASS (PyInstaller temp extraction dir).
+    For script: same as APP_DIR.
+    """
+    if getattr(sys, "frozen", False):
+        return getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    return APP_DIR
+
+RESOURCE_DIR = _get_resource_dir()
 LOG_PATH = os.path.join(APP_DIR, "voicetotext.log")
 logging.basicConfig(
     level=logging.INFO,
@@ -77,6 +95,10 @@ class VoiceToTextApp:
             if not self._prompt_api_key():
                 show_error("Voice-to-Text", "API Key is required to use this app.\nPlease restart and enter your Gemini API Key.")
                 sys.exit(1)
+
+        # Create desktop shortcut on first run (frozen exe only)
+        if getattr(sys, "frozen", False):
+            self._ensure_desktop_shortcut()
 
         # Show splash screen while loading
         splash = SplashScreen()
@@ -195,7 +217,7 @@ class VoiceToTextApp:
         root.attributes("-topmost", True)
         root.configure(bg=BG)
 
-        icon_path = os.path.join(APP_DIR, "icon.ico")
+        icon_path = os.path.join(RESOURCE_DIR, "icon.ico")
         if os.path.exists(icon_path):
             try:
                 root.iconbitmap(icon_path)
@@ -441,8 +463,10 @@ class VoiceToTextApp:
         self.config["use_gemini_cleanup"] = new_val
         save_config(self.config)
 
-        # Update transcriber
+        # Update transcriber (close old client to release connections)
         gemini_key = self.config.get("gemini_api_key", "") if new_val else ""
+        if self.transcriber:
+            self.transcriber.close()
         self.transcriber = Transcriber(
             self.config["api_key"],
             gemini_api_key=gemini_key,
@@ -453,6 +477,42 @@ class VoiceToTextApp:
             self.overlay.set_gemini_state(new_val)
         log.info(f"Gemini cleanup: {'ON' if new_val else 'OFF'}")
 
+    def _ensure_desktop_shortcut(self):
+        """Create a desktop shortcut if one doesn't exist (frozen exe only)."""
+        try:
+            desktop = os.path.join(os.environ.get("USERPROFILE", ""), "Desktop")
+            shortcut_path = os.path.join(desktop, "Voice to Text.lnk")
+            if os.path.exists(shortcut_path):
+                return  # Already exists
+
+            exe_path = sys.executable
+            icon_path = os.path.join(os.path.dirname(exe_path), "icon.ico")
+            # Fall back to bundled icon if not found next to exe
+            if not os.path.exists(icon_path):
+                icon_path = os.path.join(RESOURCE_DIR, "icon.ico")
+
+            # Use VBScript to create a proper .lnk shortcut
+            vbs_content = (
+                f'Set WshShell = CreateObject("WScript.Shell")\n'
+                f'Set shortcut = WshShell.CreateShortcut("{shortcut_path}")\n'
+                f'shortcut.TargetPath = "{exe_path}"\n'
+                f'shortcut.WorkingDirectory = "{os.path.dirname(exe_path)}"\n'
+                f'shortcut.IconLocation = "{icon_path}, 0"\n'
+                f'shortcut.Description = "Voice to Text - Press F2 to speak"\n'
+                f'shortcut.Save\n'
+            )
+            vbs_path = os.path.join(os.environ.get("TEMP", "."), "vtt_shortcut.vbs")
+            with open(vbs_path, "w", encoding="utf-8") as f:
+                f.write(vbs_content)
+            os.system(f'cscript //nologo "{vbs_path}"')
+            try:
+                os.remove(vbs_path)
+            except Exception:
+                pass
+            log.info(f"Desktop shortcut created: {shortcut_path}")
+        except Exception as e:
+            log.warning(f"Failed to create desktop shortcut: {e}")
+
     def _quit(self):
         log.info("Shutting down...")
         if self.hotkey_manager:
@@ -462,27 +522,40 @@ class VoiceToTextApp:
 
 
 def check_single_instance():
-    """Prevent multiple instances using a lock file."""
+    """Prevent multiple instances using a Windows named mutex.
+
+    A named mutex is automatically released by the OS when the process exits,
+    even on crash or force-kill, so stale locks and PID-recycling issues are
+    eliminated.
+    """
+    import ctypes
+
+    # use_last_error=True makes ctypes populate ctypes.get_last_error() reliably
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    mutex_name = "VoiceToText_SingleInstance_Mutex"
+    handle = kernel32.CreateMutexW(None, True, mutex_name)
+    last_error = ctypes.get_last_error()
+
+    if last_error == 183:  # ERROR_ALREADY_EXISTS
+        kernel32.CloseHandle(handle)
+        show_error("Voice to Text", "既に起動しています。\nタスクバー右下のアイコンを確認してください。")
+        return False
+
+    # Store the handle on the function object so it stays alive for the
+    # entire process lifetime.  Windows will release it automatically on exit.
+    check_single_instance._mutex_handle = handle
+
+    # Remove any stale .lock file left by an older version of this app so
+    # users are not confused by the leftover artefact.
     lock_path = os.path.join(APP_DIR, ".lock")
     try:
         if os.path.exists(lock_path):
-            # Check if PID in lock file is still running
-            with open(lock_path, "r") as f:
-                old_pid = int(f.read().strip())
-            import ctypes
-            kernel32 = ctypes.windll.kernel32
-            handle = kernel32.OpenProcess(0x1000, False, old_pid)  # PROCESS_QUERY_LIMITED_INFORMATION
-            if handle:
-                kernel32.CloseHandle(handle)
-                # Process still running
-                show_error("Voice to Text", "既に起動しています。\nタスクバー右下のアイコンを確認してください。")
-                return False
-        # Write our PID
-        with open(lock_path, "w") as f:
-            f.write(str(os.getpid()))
-        return True
+            os.remove(lock_path)
     except Exception:
-        return True
+        pass
+
+    return True
 
 
 if __name__ == "__main__":
@@ -497,9 +570,4 @@ if __name__ == "__main__":
         # Only show if it's truly fatal (app never started)
         sys.exit(1)
     finally:
-        # Clean up lock file
-        lock_path = os.path.join(APP_DIR, ".lock")
-        try:
-            os.remove(lock_path)
-        except Exception:
-            pass
+        pass  # mutex handle is released automatically by Windows on process exit

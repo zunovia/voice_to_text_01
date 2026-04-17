@@ -17,9 +17,10 @@ HIGHLIGHT = "#4FC3F7"
 GREEN = "#4CAF50"
 
 
-def _get_app_dir():
+def _get_resource_dir():
+    """Get the directory containing bundled assets (icons, etc.)."""
     if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
+        return getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
     return os.path.dirname(os.path.abspath(__file__))
 
 
@@ -46,7 +47,7 @@ class SettingsGUI:
         root.lift()
         root.focus_force()
 
-        icon_path = os.path.join(_get_app_dir(), "icon.ico")
+        icon_path = os.path.join(_get_resource_dir(), "icon.ico")
         if os.path.exists(icon_path):
             try:
                 root.iconbitmap(icon_path)

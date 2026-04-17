@@ -277,15 +277,24 @@ class RecordingOverlay:
 
     def show(self, text="Recording..."):
         if self._root:
-            self._root.after(0, lambda: self._do_show(text))
+            try:
+                self._root.after(0, lambda: self._do_show(text))
+            except RuntimeError:
+                pass
 
     def hide(self):
         if self._root:
-            self._root.after(0, self._do_hide)
+            try:
+                self._root.after(0, self._do_hide)
+            except RuntimeError:
+                pass
 
     def update_text(self, text: str):
         if self._root and self._label:
-            self._root.after(0, lambda: self._label.config(text=text))
+            try:
+                self._root.after(0, lambda: self._label.config(text=text))
+            except RuntimeError:
+                pass
 
     def update_audio(self, level: float, waveform: list):
         self._levels.append(level)
@@ -298,15 +307,24 @@ class RecordingOverlay:
     def set_gemini_state(self, enabled: bool):
         self._gemini_on = enabled
         if self._root and self._gemini_btn:
-            self._root.after(0, self._update_gemini_btn)
+            try:
+                self._root.after(0, self._update_gemini_btn)
+            except RuntimeError:
+                pass  # mainloop not yet running; state will be applied on next show()
 
     def update_button_label(self, text: str):
         if self._root and self._float_btn:
-            self._root.after(0, lambda: self._float_btn.update_label(text))
+            try:
+                self._root.after(0, lambda: self._float_btn.update_label(text))
+            except RuntimeError:
+                pass
 
     def set_button_recording(self, recording: bool):
         if self._root and self._float_btn:
-            self._root.after(0, lambda: self._float_btn.set_recording(recording))
+            try:
+                self._root.after(0, lambda: self._float_btn.set_recording(recording))
+            except RuntimeError:
+                pass
 
     def destroy(self):
         if self._root:
@@ -314,7 +332,10 @@ class RecordingOverlay:
                 if self._float_btn:
                     self._float_btn.destroy()
                 self._root.destroy()
-            self._root.after(0, _destroy)
+            try:
+                self._root.after(0, _destroy)
+            except RuntimeError:
+                pass
 
     def _run(self):
         self._root = tk.Tk()
@@ -382,7 +403,9 @@ class RecordingOverlay:
             hotkey_label=self._hotkey_label,
         )
 
-        self._ready.set()
+        # Signal readiness AFTER mainloop starts processing events,
+        # so that self._root.after() calls from other threads are safe.
+        self._root.after(0, self._ready.set)
         self._root.mainloop()
 
     def _update_gemini_btn(self):

@@ -27,7 +27,6 @@ AQUA Voice にインスパイアされた音声入力デスクトップアプリ
 #### 2. 依存パッケージをインストール
 ```bash
 pip install -r requirements.txt
-pip install httpx[http2] groq
 ```
 
 #### 3. Groq API Key を取得（無料）
@@ -163,7 +162,6 @@ AQUA Voice inspired voice-to-text desktop application. Press a hotkey, speak, an
 #### 2. Install dependencies
 ```bash
 pip install -r requirements.txt
-pip install httpx[http2] groq
 ```
 
 #### 3. Get a Groq API Key (Free)

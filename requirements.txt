@@ -7,4 +7,6 @@ pystray>=0.19.5
 Pillow>=10.0.0
 silero-vad>=5.1
 torch>=2.0.0
+groq>=0.4.0
+httpx[http2]>=0.27.0
 pyinstaller>=6.0.0

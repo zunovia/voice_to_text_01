@@ -14,6 +14,7 @@ class HotkeyManager:
         self.on_start = on_start or (lambda: None)
         self.on_stop = on_stop or (lambda: None)
         self._is_active = False
+        self._lock = threading.Lock()
         self._hotkey_keys = self._parse_hotkey(hotkey_str)
         self._pressed_keys = set()
         self._listener = None
@@ -36,12 +37,13 @@ class HotkeyManager:
 
     def trigger(self):
         """Toggle recording from button click (always toggle, even in push_to_talk mode)."""
-        if not self._is_active:
-            self._is_active = True
-            threading.Thread(target=self.on_start, daemon=True).start()
-        else:
-            self._is_active = False
-            threading.Thread(target=self.on_stop, daemon=True).start()
+        with self._lock:
+            if not self._is_active:
+                self._is_active = True
+                threading.Thread(target=self.on_start, daemon=True).start()
+            else:
+                self._is_active = False
+                threading.Thread(target=self.on_stop, daemon=True).start()
 
     def update_hotkey(self, hotkey_str: str):
         self._hotkey_keys = self._parse_hotkey(hotkey_str)
@@ -57,17 +59,18 @@ class HotkeyManager:
             self._pressed_keys.add(normalized)
 
         if self._is_hotkey_pressed():
-            if self.mode == "push_to_talk":
-                if not self._is_active:
-                    self._is_active = True
-                    threading.Thread(target=self.on_start, daemon=True).start()
-            elif self.mode == "toggle":
-                if not self._is_active:
-                    self._is_active = True
-                    threading.Thread(target=self.on_start, daemon=True).start()
-                else:
-                    self._is_active = False
-                    threading.Thread(target=self.on_stop, daemon=True).start()
+            with self._lock:
+                if self.mode == "push_to_talk":
+                    if not self._is_active:
+                        self._is_active = True
+                        threading.Thread(target=self.on_start, daemon=True).start()
+                elif self.mode == "toggle":
+                    if not self._is_active:
+                        self._is_active = True
+                        threading.Thread(target=self.on_start, daemon=True).start()
+                    else:
+                        self._is_active = False
+                        threading.Thread(target=self.on_stop, daemon=True).start()
 
     def _on_release(self, key):
         if not self._running:
@@ -76,10 +79,11 @@ class HotkeyManager:
         if normalized:
             self._pressed_keys.discard(normalized)
 
-        if self.mode == "push_to_talk" and self._is_active:
-            if not self._is_hotkey_pressed():
-                self._is_active = False
-                threading.Thread(target=self.on_stop, daemon=True).start()
+        if self.mode == "push_to_talk":
+            with self._lock:
+                if self._is_active and not self._is_hotkey_pressed():
+                    self._is_active = False
+                    threading.Thread(target=self.on_stop, daemon=True).start()
 
     def _is_hotkey_pressed(self) -> bool:
         return self._hotkey_keys.issubset(self._pressed_keys)

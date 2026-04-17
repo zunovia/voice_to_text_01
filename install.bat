@@ -9,13 +9,31 @@ set "INSTALL_DIR=%LOCALAPPDATA%\VoiceToText"
 set "DESKTOP=%USERPROFILE%\Desktop"
 set "SOURCE=%~dp0"
 
-:: Check if exe exists
+:: Check if exe exists; if not, guide user to source-based usage
 if not exist "%SOURCE%dist\VoiceToText.exe" (
-    echo  ERROR: VoiceToText.exe not found.
-    echo  Please run build.bat first.
+    echo  VoiceToText.exe not found.
+    echo.
+    echo  ========================================
+    echo   Source Mode Setup
+    echo  ========================================
+    echo.
+    echo  Installing Python dependencies...
+    pip install -r "%SOURCE%requirements.txt"
+    echo.
+    echo  ========================================
+    echo   Setup Complete!
+    echo  ========================================
+    echo.
+    echo   To start the app, run:
+    echo     python main.py
+    echo   Or double-click VoiceToText.vbs
+    echo.
+    echo   First launch will ask for your API key.
+    echo   Get free API key: https://console.groq.com
+    echo  ========================================
     echo.
     pause
-    exit /b 1
+    exit /b 0
 )
 
 echo  Installing to: %INSTALL_DIR%

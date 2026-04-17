@@ -6,7 +6,10 @@ import sys
 
 def _get_app_dir():
     if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
+        appdata = os.environ.get("LOCALAPPDATA", os.environ.get("APPDATA", os.path.expanduser("~")))
+        data_dir = os.path.join(appdata, "VoiceToText")
+        os.makedirs(data_dir, exist_ok=True)
+        return data_dir
     return os.path.dirname(os.path.abspath(__file__))
 
 
@@ -25,11 +28,17 @@ class SplashScreen:
 
     def update(self, text: str):
         if self._root and self._label:
-            self._root.after(0, lambda: self._label.config(text=text))
+            try:
+                self._root.after(0, lambda: self._label.config(text=text))
+            except RuntimeError:
+                pass
 
     def close(self):
         if self._root:
-            self._root.after(0, self._root.destroy)
+            try:
+                self._root.after(0, self._root.destroy)
+            except RuntimeError:
+                pass
 
     def _run(self):
         BG = "#1a1a2e"
@@ -59,5 +68,5 @@ class SplashScreen:
                                fg="#888888", bg=BG)
         self._label.pack(pady=(10, 0))
 
-        self._ready.set()
+        self._root.after(0, self._ready.set)
         self._root.mainloop()
