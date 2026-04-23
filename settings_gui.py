@@ -35,15 +35,15 @@ class SettingsGUI:
 
         root = tk.Tk()
         root.title("Voice to Text - Settings")
-        root.geometry("520x660")
+        root.geometry("520x720")
         root.resizable(False, False)
         root.attributes("-topmost", True)
         root.configure(bg=BG_COLOR)
 
         root.update_idletasks()
         x = (root.winfo_screenwidth() - 520) // 2
-        y = (root.winfo_screenheight() - 660) // 2
-        root.geometry(f"520x660+{x}+{y}")
+        y = (root.winfo_screenheight() - 720) // 2
+        root.geometry(f"520x720+{x}+{y}")
         root.lift()
         root.focus_force()
 
@@ -74,7 +74,19 @@ class SettingsGUI:
             # Update config
             config["api_key"] = api_key
             config["gemini_api_key"] = gemini_var.get().strip()
-            config["use_gemini_cleanup"] = gemini_cleanup_var.get()
+            use_llm = llm_cleanup_var.get()
+            config["use_llm_cleanup"] = use_llm
+            config["use_gemini_cleanup"] = use_llm  # keep in sync
+            # Provider: map display value back to internal key
+            provider_display = llm_provider_var.get()
+            if "Gemini" in provider_display:
+                config["llm_provider"] = "gemini"
+            else:
+                config["llm_provider"] = "groq"
+            # Model: extract model ID from display string
+            model_display = groq_model_var.get()
+            model_id = model_display.split(" ")[0] if model_display else "llama-3.1-8b-instant"
+            config["groq_llm_model"] = model_id
             config["hotkey"] = hotkey_var.get().strip()
             config["mode"] = mode_var.get()
             config["language"] = lang_var.get()
@@ -155,11 +167,72 @@ class SettingsGUI:
                                  bg=CARD_COLOR)
         gemini_status.pack(anchor="w", pady=(0, 4))
 
-        gemini_cleanup_var = tk.BooleanVar(value=config.get("use_gemini_cleanup", False))
-        tk.Checkbutton(api_card, text=t("settings_gemini_check", L),
-                       variable=gemini_cleanup_var, font=("Segoe UI", 9),
+        # LLM cleanup section
+        use_llm_init = config.get("use_llm_cleanup", config.get("use_gemini_cleanup", False))
+        llm_cleanup_var = tk.BooleanVar(value=use_llm_init)
+        tk.Checkbutton(api_card, text=t("settings_llm_check", L),
+                       variable=llm_cleanup_var, font=("Segoe UI", 9),
                        fg=TEXT_COLOR, bg=CARD_COLOR, selectcolor=ACCENT_COLOR,
                        activebackground=CARD_COLOR, activeforeground=TEXT_COLOR).pack(anchor="w")
+
+        # LLM provider dropdown
+        llm_provider_frame = tk.Frame(api_card, bg=CARD_COLOR)
+        llm_provider_frame.pack(fill="x", pady=(4, 0))
+        tk.Label(llm_provider_frame, text=t("settings_llm_provider", L), font=("Segoe UI", 9),
+                 fg=TEXT_COLOR, bg=CARD_COLOR).pack(side="left")
+
+        gemini_current_key = config.get("gemini_api_key", "")
+        gemini_has_key = bool(gemini_current_key and len(gemini_current_key) > 10)
+        provider_options_ja = ["Groq (高速)"]
+        provider_options_en = ["Groq (Fast)"]
+        if gemini_has_key:
+            provider_options_ja.append("Gemini")
+            provider_options_en.append("Gemini")
+        provider_options = provider_options_ja if L == "ja" else provider_options_en
+
+        current_provider = config.get("llm_provider", "groq")
+        if current_provider == "gemini" and gemini_has_key:
+            provider_init = "Gemini"
+        else:
+            provider_init = provider_options[0]
+        llm_provider_var = tk.StringVar(value=provider_init)
+        llm_provider_combo = ttk.Combobox(llm_provider_frame, textvariable=llm_provider_var,
+                                           values=provider_options, width=18, state="readonly",
+                                           style="Dark.TCombobox")
+        llm_provider_combo.pack(side="left", padx=(5, 0))
+
+        # Groq model dropdown (shown only when Groq is selected)
+        groq_model_frame = tk.Frame(api_card, bg=CARD_COLOR)
+        groq_model_frame.pack(fill="x", pady=(4, 2))
+        tk.Label(groq_model_frame, text=t("settings_groq_model", L), font=("Segoe UI", 9),
+                 fg=TEXT_COLOR, bg=CARD_COLOR).pack(side="left")
+
+        groq_model_options = [
+            "llama-3.1-8b-instant (最速)" if L == "ja" else "llama-3.1-8b-instant (Fastest)",
+            "qwen/qwen3-32b (高品質)" if L == "ja" else "qwen/qwen3-32b (High quality)",
+            "llama-3.3-70b-versatile (バランス)" if L == "ja" else "llama-3.3-70b-versatile (Balanced)",
+        ]
+        current_model = config.get("groq_llm_model", "llama-3.1-8b-instant")
+        # Find matching display option
+        model_init = groq_model_options[0]
+        for opt in groq_model_options:
+            if opt.startswith(current_model):
+                model_init = opt
+                break
+        groq_model_var = tk.StringVar(value=model_init)
+        groq_model_combo = ttk.Combobox(groq_model_frame, textvariable=groq_model_var,
+                                         values=groq_model_options, width=38, state="readonly",
+                                         style="Dark.TCombobox")
+        groq_model_combo.pack(side="left", padx=(5, 0))
+
+        def _update_groq_model_visibility(*args):
+            if "Gemini" in llm_provider_var.get():
+                groq_model_frame.pack_forget()
+            else:
+                groq_model_frame.pack(fill="x", pady=(4, 2))
+
+        llm_provider_var.trace_add("write", _update_groq_model_visibility)
+        _update_groq_model_visibility()
 
         # === Controls Section ===
         ctrl_card = tk.Frame(main, bg=CARD_COLOR, padx=15, pady=10)

@@ -243,7 +243,7 @@ class FloatingButton:
 
 
 class RecordingOverlay:
-    """Overlay window with real-time waveform visualization and Gemini toggle."""
+    """Overlay window with real-time waveform visualization and LLM cleanup toggle."""
 
     WIDTH = 320
     HEIGHT = 110
@@ -252,7 +252,7 @@ class RecordingOverlay:
     BG_COLOR = "#1E1E1E"
     BAR_COUNT = 40
 
-    def __init__(self, on_gemini_toggle=None, lang="ja", on_button_click=None, hotkey_label="F2"):
+    def __init__(self, on_gemini_toggle=None, on_llm_toggle=None, lang="ja", on_button_click=None, hotkey_label="F2"):
         self._root = None
         self._canvas = None
         self._label = None
@@ -265,7 +265,10 @@ class RecordingOverlay:
         self._waveform = [0.0] * self.BAR_COUNT
         self._animating = False
         self._gemini_on = False
-        self._on_gemini_toggle = on_gemini_toggle
+        self._llm_on = False
+        self._llm_provider = "groq"
+        # on_llm_toggle takes priority; on_gemini_toggle kept for backward compat
+        self._on_llm_toggle = on_llm_toggle or on_gemini_toggle
         self._on_button_click = on_button_click
         self._hotkey_label = hotkey_label
         self._lang = lang
@@ -305,7 +308,19 @@ class RecordingOverlay:
                 self._waveform = waveform + [0.0] * (self.BAR_COUNT - len(waveform))
 
     def set_gemini_state(self, enabled: bool):
+        """Backward-compatible alias for set_llm_state."""
         self._gemini_on = enabled
+        self._llm_on = enabled
+        if self._root and self._gemini_btn:
+            try:
+                self._root.after(0, self._update_gemini_btn)
+            except RuntimeError:
+                pass  # mainloop not yet running; state will be applied on next show()
+
+    def set_llm_state(self, enabled: bool, provider: str = "groq"):
+        self._llm_on = enabled
+        self._gemini_on = enabled
+        self._llm_provider = provider
         if self._root and self._gemini_btn:
             try:
                 self._root.after(0, self._update_gemini_btn)
@@ -362,10 +377,10 @@ class RecordingOverlay:
         )
         self._label.pack(side="left")
 
-        # Gemini toggle button
+        # LLM cleanup toggle button
         self._gemini_btn = tk.Label(
             top_frame,
-            text="Gemini OFF",
+            text=t("llm_off", self._lang),
             font=("Segoe UI", 8),
             fg="#999999",
             bg="#333333",
@@ -374,7 +389,7 @@ class RecordingOverlay:
             cursor="hand2",
         )
         self._gemini_btn.pack(side="right")
-        self._gemini_btn.bind("<Button-1>", self._on_gemini_click)
+        self._gemini_btn.bind("<Button-1>", self._on_llm_click)
 
         # Waveform canvas
         self._canvas = tk.Canvas(
@@ -410,15 +425,19 @@ class RecordingOverlay:
 
     def _update_gemini_btn(self):
         if self._gemini_btn:
-            if self._gemini_on:
+            if self._llm_on:
+                if self._llm_provider == "gemini":
+                    label = t("llm_on_gemini", self._lang)
+                else:
+                    label = t("llm_on_groq", self._lang)
                 self._gemini_btn.config(
-                    text=t("gemini_on", self._lang),
+                    text=label,
                     fg="#FFFFFF",
                     bg="#4CAF50",
                 )
             else:
                 self._gemini_btn.config(
-                    text=t("gemini_off", self._lang),
+                    text=t("llm_off", self._lang),
                     fg="#999999",
                     bg="#333333",
                 )
@@ -427,9 +446,13 @@ class RecordingOverlay:
         if self._on_button_click:
             threading.Thread(target=self._on_button_click, daemon=True).start()
 
+    def _on_llm_click(self, event):
+        if self._on_llm_toggle:
+            self._on_llm_toggle()
+
     def _on_gemini_click(self, event):
-        if self._on_gemini_toggle:
-            self._on_gemini_toggle()
+        """Backward-compatible alias."""
+        self._on_llm_click(event)
 
     def _do_show(self, text: str):
         if self._label:

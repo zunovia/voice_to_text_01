@@ -1,5 +1,4 @@
 import threading
-import subprocess
 import sys
 import os
 import pystray
@@ -41,12 +40,16 @@ def _create_icon(color: str = "green", size: int = 64) -> Image.Image:
 
 
 class TrayApp:
-    def __init__(self, on_settings=None, on_quit=None, on_mode_toggle=None, on_gemini_toggle=None, lang="ja"):
+    def __init__(self, on_settings=None, on_quit=None, on_mode_toggle=None,
+                 on_gemini_toggle=None, on_llm_toggle=None, lang="ja"):
         self.on_settings = on_settings or (lambda: None)
         self.on_quit = on_quit or (lambda: None)
         self.on_mode_toggle = on_mode_toggle or (lambda: None)
-        self.on_gemini_toggle = on_gemini_toggle or (lambda: None)
+        # on_llm_toggle takes priority; on_gemini_toggle kept for backward compat
+        self.on_llm_toggle = on_llm_toggle or on_gemini_toggle or (lambda: None)
         self._gemini_cleanup = False
+        self._llm_cleanup = False
+        self._llm_provider = "groq"
         self._icon_normal = _create_icon("green")
         self._icon_recording = _create_icon("red")
         self._icon_processing = _create_icon("orange")
@@ -70,8 +73,13 @@ class TrayApp:
                 self._toggle_mode,
             ),
             pystray.MenuItem(
-                lambda item: t("tray_gemini_on" if self._gemini_cleanup else "tray_gemini_off", self._lang),
-                self._toggle_gemini,
+                lambda item: t(
+                    "tray_llm_on_groq" if (self._llm_cleanup and self._llm_provider != "gemini")
+                    else ("tray_llm_on_gemini" if (self._llm_cleanup and self._llm_provider == "gemini")
+                          else "tray_llm_off"),
+                    self._lang
+                ),
+                self._toggle_llm,
             ),
             pystray.MenuItem(lambda item: t("tray_settings", self._lang), self._open_settings),
             pystray.MenuItem(
@@ -107,10 +115,21 @@ class TrayApp:
         self._current_mode = mode
 
     def set_gemini_cleanup(self, enabled: bool):
+        """Backward-compatible alias for set_llm_cleanup."""
         self._gemini_cleanup = enabled
+        self._llm_cleanup = enabled
+
+    def set_llm_cleanup(self, enabled: bool, provider: str = "groq"):
+        self._llm_cleanup = enabled
+        self._gemini_cleanup = enabled
+        self._llm_provider = provider
+
+    def _toggle_llm(self):
+        self.on_llm_toggle()
 
     def _toggle_gemini(self):
-        self.on_gemini_toggle()
+        """Backward-compatible alias."""
+        self._toggle_llm()
 
     def _toggle_autostart(self):
         if is_autostart_enabled():

@@ -1,7 +1,9 @@
 {
   "api_key": "",
   "gemini_api_key": "",
-  "use_gemini_cleanup": false,
+  "use_llm_cleanup": true,
+  "llm_provider": "groq",
+  "groq_llm_model": "llama-3.1-8b-instant",
   "hotkey": "f2",
   "mode": "toggle",
   "language": "ja",

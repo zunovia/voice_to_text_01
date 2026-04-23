@@ -94,12 +94,14 @@ python main.py
 
 ```json
 {
-  "api_key": "gsk_...",           // Groq API キー
-  "hotkey": "f2",                  // 録音トグルのホットキー
-  "mode": "toggle",               // "toggle"（トグル）または "push_to_talk"（押しっぱなし）
-  "language": "ja",                // 言語コード
-  "use_gemini_cleanup": false,     // Geminiによる句読点後処理（ONにすると精度UP、速度DOWN）
-  "gemini_api_key": ""             // Gemini APIキー（オプション）
+  "api_key": "gsk_...",              // Groq API キー（STT + LLM共用）
+  "hotkey": "f2",                     // 録音トグルのホットキー
+  "mode": "toggle",                  // "toggle"（トグル）または "push_to_talk"（押しっぱなし）
+  "language": "ja",                   // 言語コード
+  "use_llm_cleanup": true,           // LLMによるテキスト整形（句読点・フィラー除去）
+  "llm_provider": "groq",            // "groq"（高速・無料）または "gemini"（高精度）
+  "groq_llm_model": "llama-3.1-8b-instant",  // Groq LLMモデル
+  "gemini_api_key": ""               // Gemini APIキー（オプション）
 }
 ```
 
@@ -128,15 +130,36 @@ build.bat
 3. `config.json` にAPIキーを入力
 4. デスクトップの「Voice to Text」をダブルクリック
 
-### Windows SmartScreen の警告について
+### Windows の警告について
 
-初回起動時に「WindowsによってPCが保護されました」という青い画面が表示されることがあります。これはコード署名されていないアプリに対するWindowsの標準的な警告で、アプリ自体に問題があるわけではありません。
+初回起動時にWindowsの警告画面が表示されることがあります。これはコード署名されていないアプリに対する標準的な警告で、アプリ自体に問題があるわけではありません。
 
-**回避手順:**
+#### パターン1: SmartScreen（青い画面「WindowsによってPCが保護されました」）
 
-1. 青い画面で **「詳細情報」** をクリック
-2. **「実行」** ボタンが表示されるのでクリック
+1. **「詳細情報」** をクリック
+2. **「実行」** ボタンをクリック
 3. 次回以降は表示されません
+
+#### パターン2: スマート アプリ コントロール（実行がブロックされる場合）
+
+Windows 11 でアプリが完全にブロックされる場合:
+
+1. ダウンロードしたファイル（exe / zip）を**右クリック** → **「プロパティ」**
+2. 下部の **「ブロックの解除」** にチェックを入れる → **「OK」**
+3. ZIPの場合は**解除後に再展開**してください
+
+それでもブロックされる場合（スマート アプリ コントロールが「評価」または「オン」の場合）:
+
+1. **設定** → **プライバシーとセキュリティ** → **Windows セキュリティ**
+2. **アプリとブラウザーの制御** → **スマート アプリ コントロールの設定**
+3. **「オフ」** に切り替え
+
+#### パターン3: 上記で解決しない場合（Pythonから直接実行）
+
+```bash
+pip install -r requirements.txt
+python main.py
+```
 
 > このアプリはオープンソースです。ソースコードはすべて公開されており、安全性を確認できます。
 
@@ -240,12 +263,14 @@ Edit `config.json` (created on first run):
 
 ```json
 {
-  "api_key": "gsk_...",           // Groq API key
-  "hotkey": "f2",                  // Hotkey to toggle recording
-  "mode": "toggle",               // "toggle" or "push_to_talk"
-  "language": "ja",                // Language code
-  "use_gemini_cleanup": false,     // Enable Gemini post-processing for better punctuation
-  "gemini_api_key": ""             // Gemini API key (optional, for cleanup)
+  "api_key": "gsk_...",              // Groq API key (STT + LLM shared)
+  "hotkey": "f2",                     // Hotkey to toggle recording
+  "mode": "toggle",                  // "toggle" or "push_to_talk"
+  "language": "ja",                   // Language code
+  "use_llm_cleanup": true,           // LLM text formatting (punctuation, filler removal)
+  "llm_provider": "groq",            // "groq" (fast, free) or "gemini" (accurate)
+  "groq_llm_model": "llama-3.1-8b-instant",  // Groq LLM model
+  "gemini_api_key": ""               // Gemini API key (optional)
 }
 ```
 
@@ -274,15 +299,36 @@ Output: `dist/VoiceToText.exe`
 3. Edit `config.json` with your API key
 4. Double-click "Voice to Text" on desktop
 
-### Windows SmartScreen Warning
+### Windows Security Warnings
 
-On first launch you may see a blue "Windows protected your PC" screen. This is a standard Windows warning for unsigned apps and does not mean there is anything wrong with the application.
+On first launch, Windows may show a warning. This is standard for unsigned apps and does not indicate any problem.
 
-**How to proceed:**
+#### Pattern 1: SmartScreen (blue "Windows protected your PC" screen)
 
-1. Click **"More info"** on the blue screen
-2. Click the **"Run anyway"** button
-3. The warning will not appear again after this
+1. Click **"More info"**
+2. Click **"Run anyway"**
+3. Won't appear again after this
+
+#### Pattern 2: Smart App Control (app is completely blocked)
+
+On Windows 11, the app may be blocked entirely:
+
+1. **Right-click** the downloaded file (exe/zip) → **"Properties"**
+2. Check **"Unblock"** at the bottom → **"OK"**
+3. If ZIP, **re-extract after unblocking**
+
+If still blocked (Smart App Control is set to "Evaluation" or "On"):
+
+1. **Settings** → **Privacy & Security** → **Windows Security**
+2. **App & browser control** → **Smart App Control settings**
+3. Switch to **"Off"**
+
+#### Pattern 3: If none of the above works (run from source)
+
+```bash
+pip install -r requirements.txt
+python main.py
+```
 
 > This app is open source. All source code is publicly available for review.
 

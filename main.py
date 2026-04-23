@@ -107,12 +107,14 @@ class VoiceToTextApp:
 
         # Initialize transcriber
         try:
-            gemini_key = ""
-            if self.config.get("use_gemini_cleanup", False):
-                gemini_key = self.config.get("gemini_api_key", "")
+            gemini_key = self.config.get("gemini_api_key", "")
+            llm_provider = self.config.get("llm_provider", "groq")
+            groq_llm_model = self.config.get("groq_llm_model", "llama-3.1-8b-instant")
             self.transcriber = Transcriber(
                 self.config["api_key"],
                 gemini_api_key=gemini_key,
+                llm_provider=llm_provider,
+                groq_llm_model=groq_llm_model,
             )
             splash.update("Loading voice detection...")
         except Exception as e:
@@ -130,13 +132,15 @@ class VoiceToTextApp:
         # Initialize overlay
         hotkey_label = self._format_hotkey_label(self.config.get("hotkey", "ctrl+shift+space"))
         self.overlay = RecordingOverlay(
-            on_gemini_toggle=self._toggle_gemini_cleanup,
+            on_llm_toggle=self._toggle_llm_cleanup,
             lang=lang,
             on_button_click=self._on_button_click,
             hotkey_label=hotkey_label,
         )
         self.overlay.start()
-        self.overlay.set_gemini_state(self.config.get("use_gemini_cleanup", False))
+        use_llm = self.config.get("use_llm_cleanup", self.config.get("use_gemini_cleanup", False))
+        llm_provider = self.config.get("llm_provider", "groq")
+        self.overlay.set_llm_state(use_llm, llm_provider)
 
         # Connect recorder audio levels to overlay waveform
         self.recorder.set_level_callback(
@@ -159,11 +163,13 @@ class VoiceToTextApp:
             on_settings=self._show_settings,
             on_quit=self._quit,
             on_mode_toggle=self._toggle_mode,
-            on_gemini_toggle=self._toggle_gemini_cleanup,
+            on_llm_toggle=self._toggle_llm_cleanup,
             lang=lang,
         )
         self.tray.set_mode(self.config.get("mode", "push_to_talk"))
-        self.tray.set_gemini_cleanup(self.config.get("use_gemini_cleanup", False))
+        use_llm = self.config.get("use_llm_cleanup", self.config.get("use_gemini_cleanup", False))
+        llm_provider = self.config.get("llm_provider", "groq")
+        self.tray.set_llm_cleanup(use_llm, llm_provider)
 
         hotkey = self.config.get("hotkey", "ctrl+shift+space")
         mode = self.config.get("mode", "push_to_talk")
@@ -396,7 +402,8 @@ class VoiceToTextApp:
             return
 
         try:
-            text = self.transcriber.transcribe(wav_data)
+            use_cleanup = self.config.get("use_llm_cleanup", self.config.get("use_gemini_cleanup", False))
+            text = self.transcriber.transcribe(wav_data, use_cleanup=use_cleanup)
             if text:
                 log.info(f"Transcribed: {text}")
                 self.inserter.process_and_insert(text)
@@ -425,16 +432,30 @@ class VoiceToTextApp:
 
     def _on_settings_saved(self, new_config):
         self.config = new_config
+        # Recreate transcriber with new settings
         if self.transcriber:
-            self.transcriber.update_api_key(new_config["api_key"])
+            self.transcriber.close()
+        gemini_key = new_config.get("gemini_api_key", "")
+        llm_provider = new_config.get("llm_provider", "groq")
+        groq_llm_model = new_config.get("groq_llm_model", "llama-3.1-8b-instant")
+        self.transcriber = Transcriber(
+            new_config["api_key"],
+            gemini_api_key=gemini_key,
+            llm_provider=llm_provider,
+            groq_llm_model=groq_llm_model,
+        )
         self.inserter.update_voice_commands(new_config.get("voice_commands", {}))
         self._setup_hotkey()
         if self.tray:
             self.tray.set_mode(new_config.get("mode", "push_to_talk"))
+            use_llm = new_config.get("use_llm_cleanup", new_config.get("use_gemini_cleanup", False))
+            self.tray.set_llm_cleanup(use_llm, llm_provider)
         if self.overlay:
             self.overlay.update_button_label(
                 self._format_hotkey_label(new_config.get("hotkey", "ctrl+shift+space"))
             )
+            use_llm = new_config.get("use_llm_cleanup", new_config.get("use_gemini_cleanup", False))
+            self.overlay.set_llm_state(use_llm, llm_provider)
         log.info(f"Settings updated. Hotkey: {new_config['hotkey']}, Mode: {new_config['mode']}")
 
     def _preload_vad(self):
@@ -457,25 +478,34 @@ class VoiceToTextApp:
             self.tray.set_mode(new_mode)
         log.info(f"Mode switched to: {new_mode}")
 
-    def _toggle_gemini_cleanup(self):
-        current = self.config.get("use_gemini_cleanup", False)
+    def _toggle_llm_cleanup(self):
+        current = self.config.get("use_llm_cleanup", self.config.get("use_gemini_cleanup", False))
         new_val = not current
-        self.config["use_gemini_cleanup"] = new_val
+        self.config["use_llm_cleanup"] = new_val
+        self.config["use_gemini_cleanup"] = new_val  # keep in sync for backward compat
         save_config(self.config)
 
+        llm_provider = self.config.get("llm_provider", "groq")
         # Update transcriber (close old client to release connections)
-        gemini_key = self.config.get("gemini_api_key", "") if new_val else ""
         if self.transcriber:
             self.transcriber.close()
+        gemini_key = self.config.get("gemini_api_key", "")
+        groq_llm_model = self.config.get("groq_llm_model", "llama-3.1-8b-instant")
         self.transcriber = Transcriber(
             self.config["api_key"],
             gemini_api_key=gemini_key,
+            llm_provider=llm_provider,
+            groq_llm_model=groq_llm_model,
         )
         if self.tray:
-            self.tray.set_gemini_cleanup(new_val)
+            self.tray.set_llm_cleanup(new_val, llm_provider)
         if self.overlay:
-            self.overlay.set_gemini_state(new_val)
-        log.info(f"Gemini cleanup: {'ON' if new_val else 'OFF'}")
+            self.overlay.set_llm_state(new_val, llm_provider)
+        log.info(f"LLM cleanup ({llm_provider}): {'ON' if new_val else 'OFF'}")
+
+    def _toggle_gemini_cleanup(self):
+        """Backward-compatible alias for _toggle_llm_cleanup."""
+        self._toggle_llm_cleanup()
 
     def _ensure_desktop_shortcut(self):
         """Create a desktop shortcut if one doesn't exist (frozen exe only)."""

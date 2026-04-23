@@ -30,6 +30,9 @@ DEFAULT_CONFIG = {
     "api_key": "",
     "gemini_api_key": "",
     "use_gemini_cleanup": False,
+    "use_llm_cleanup": True,
+    "llm_provider": "groq",
+    "groq_llm_model": "llama-3.1-8b-instant",
     "hotkey": "f2",
     "mode": "toggle",
     "language": "ja",
@@ -72,6 +75,14 @@ def load_config() -> dict:
                 **DEFAULT_CONFIG["voice_commands"],
                 **config.get("voice_commands", {}),
             }
+            # Migration: use_gemini_cleanup -> use_llm_cleanup
+            if "use_llm_cleanup" not in config and config.get("use_gemini_cleanup", False):
+                merged["use_llm_cleanup"] = True
+                if config.get("gemini_api_key", ""):
+                    merged["llm_provider"] = "gemini"
+                else:
+                    merged["llm_provider"] = "groq"
+                log.info("Migrated use_gemini_cleanup -> use_llm_cleanup")
             return merged
         except Exception as e:
             log.error(f"Failed to load config: {e}")
