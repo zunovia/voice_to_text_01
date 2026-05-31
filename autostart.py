@@ -13,11 +13,13 @@ SHORTCUT_NAME = "VoiceToText.vbs"
 
 def _get_app_path() -> str:
     """Get the path to the launcher script or exe."""
-    app_dir = os.path.dirname(os.path.abspath(__file__))
-    # If running as exe
+    # If running as a frozen exe, the real executable is sys.executable.
+    # NOTE: os.path.dirname(__file__) points into the PyInstaller _MEIPASS
+    # temp dir when frozen, so it must NOT be used for the exe path.
     if getattr(sys, "frozen", False):
-        return os.path.join(app_dir, "VoiceToText.exe")
-    # If running as script, use VoiceToText.vbs
+        return sys.executable
+    # If running as script, use VoiceToText.vbs next to this file
+    app_dir = os.path.dirname(os.path.abspath(__file__))
     vbs = os.path.join(app_dir, "VoiceToText.vbs")
     if os.path.exists(vbs):
         return vbs

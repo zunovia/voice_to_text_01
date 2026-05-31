@@ -2,32 +2,35 @@
 
 [English](#english) | [日本語](#日本語)
 
+> **v3.0.0** — Groq 一本化・起動高速化（339MB→89MB）・AI校正モード・モダンUIに刷新
+
 ---
 
 ## 日本語
 
-AQUA Voice にインスパイアされた音声入力デスクトップアプリです。ホットキーを押して話すだけで、文字起こしされたテキストがカーソル位置に挿入されます。
+SuperWhisper / Aqua Voice にインスパイアされた音声入力デスクトップアプリです。ホットキーを押して話すだけで、文字起こし＋AI校正されたテキストがカーソル位置に挿入されます。**API は Groq 一本**（APIキー1つで完結）。
 
 ### 特徴
 
-- **どのアプリでも使える** - Chrome、Word、VS Code、Slack など全てのアプリで動作
-- **高速変換** - Groq Whisper API で約0.3秒のレイテンシー
-- **日本語最適化** - 高精度な日本語認識と句読点
-- **音声コマンド** - 「エンター」で改行、「まる」で句点など
-- **トグル方式** - F2で録音開始、もう一度押して停止
-- **フローティングボタン** - 画面右下に常時表示。マイク(録音ON/OFF) + Enterボタン付き。ドラッグで移動可能
-- **システムトレイ常駐** - バックグラウンドで静かに動作
-- **波形オーバーレイ** - 録音中にリアルタイム波形表示
-- **クロスプラットフォーム** - Windows / macOS 対応
+- **どのアプリでも使える** — Chrome、Word、VS Code、Slack など全てのアプリで動作
+- **高速** — Groq Whisper で約0.3〜0.5秒。マイクは常時ウォーム状態なので**押した瞬間に録音開始**（オープン待ちゼロ）
+- **軽量・速い起動** — torch を撤廃し exe は **約89MB**（旧339MB）。起動の待ち時間を大幅短縮
+- **AI校正モード** — 句読点付与・フィラー除去に加え、**文脈から誤変換の漢字を自動修正**（例: 成形→整形、機械→機会）。整形 LLM は Groq `gpt-oss-20b`（プロンプトキャッシュ対応）
+- **ユーザー辞書** — よく使う固有名詞・専門用語を登録すると Whisper の認識精度が向上
+- **音声コマンド** — 「エンター」で改行、「まる」で句点など（最長一致で正確に変換）
+- **モダンなフローティングボタン** — 画面右下に常時表示のティール／シアンの縦長カプセル。上＝マイク（録音ON/OFF）、下＝Enter。ドラッグで移動可能・常に最前面に自動固定
+- **状態が一目でわかる** — 状態ドット（待機/録音/処理中/完了）＋効果音（録音開始・停止・完了）
+- **システムトレイ常駐** — バックグラウンドで静かに動作
+- **波形オーバーレイ** — 録音中にリアルタイム波形表示
 
 ### インストール（exe版・推奨）
 
-1. [Releases](https://github.com/zunovia/voice_to_text_01/releases) から **VoiceToText-v2.0.0.zip** をダウンロード
+1. [Releases](https://github.com/zunovia/voice_to_text_01/releases) から **VoiceToText-v3.0.0.zip** をダウンロード
 2. ZIPを任意のフォルダに展開
 3. `install.bat` をダブルクリックで実行
-4. デスクトップに「Voice to Text」ショートカットが作成されます
+4. デスクトップに「Voice to Text」ショートカットが作成されます（OneDrive のデスクトップにも正しく対応）
 5. ショートカットをダブルクリックで起動
-6. 初回起動時にGroq API Keyの入力画面が表示されます（取得方法は下記参照）
+6. 初回起動時に Groq API Key の入力画面が表示されます（取得方法は下記参照）
 
 > **SmartScreenの警告が出た場合:** 「詳細情報」→「実行」をクリックしてください（初回のみ）
 
@@ -39,6 +42,7 @@ AQUA Voice にインスパイアされた音声入力デスクトップアプリ
 ```bash
 pip install -r requirements.txt
 ```
+> torch / silero-vad は不要になりました（無音判定は numpy の軽量 RMS ゲートに置換）。
 
 #### 3. Groq API Key を取得（無料）
 
@@ -48,33 +52,32 @@ pip install -r requirements.txt
 4. **Create API Key** をクリック
 5. キーをコピー（`gsk_...` で始まる）
 
-Groq 無料枠: **14,400リクエスト/日**（個人利用なら実質無制限）
+Groq 無料枠: STT 2,000回/日 + LLM 14,400回/日（個人利用なら実質無料）
 
 #### 4. 起動
 ```bash
 python main.py
 ```
 
-初回起動時にGroq API Keyの入力画面が表示されます。
+初回起動時に Groq API Key の入力画面が表示されます。
 
 **Windows:** `VoiceToText.vbs` をダブルクリックするとコンソール非表示で起動します。
 
 #### 5. 使い方
 
-- **F2**（またはFn+F2）を押す → 録音開始
+- **F2**（またはFn+F2）を押す → 録音開始（効果音＋ボタンがコーラルに点灯）
 - 話す
-- **F2** をもう一度押す → 録音停止 → テキスト変換 → カーソル位置に挿入
+- **F2** をもう一度押す → 録音停止 → 文字起こし＋校正 → カーソル位置に挿入
 
 #### フローティングボタン
 
-画面右下にフローティングボタンが常時表示されます。どの画面でも見やすいグローリング付きデザインです。
+画面右下に、ティール／シアンの**縦長カプセル**が常時表示されます。
 
-- **マイクボタン** (上) → クリックで録音開始/停止（F2キーと同じ動作）
-- **Enterボタン** (下) → クリックでEnterキーを送信（チャット送信などに便利）
-- **ドラッグ** → 両ボタンまとめて好きな位置に移動
-- 録音中はボタンとリングが **赤色** に変化
-- ホットキーを設定画面で変更するとボタンのラベルも自動更新
-- ボタンクリック時にフォーカスは奪われないため、テキスト入力中でも安心して使えます
+- **上＝マイク部**（ダーク＋ティールの円） → クリックで録音開始/停止（F2と同じ）。録音中は**コーラル（ピンク）**に点灯
+- **下＝Enterバー**（明るいスレート色） → クリックで Enter キーを送信（チャット送信に便利）。色で上下を見分けやすく
+- **ドラッグ** → カプセルごと好きな位置に移動
+- 他アプリが全画面でも**自動で最前面に復帰**（1.5秒ごとに再固定）
+- ボタンクリック時にフォーカスを奪わないため、テキスト入力中でも安心
 
 ### 音声コマンド
 
@@ -83,83 +86,52 @@ python main.py
 | エンター / 改行 | 改行（Enter） |
 | まる / ピリオド | 。 |
 | てん / カンマ | 、 |
-| かっこ | （ |
-| かっことじ | ） |
-| かぎかっこ | 「 |
-| かぎかっことじ | 」 |
+| かっこ / かっことじ | （ / ） |
+| かぎかっこ / かぎかっことじ | 「 / 」 |
+| すみかっこ / すみかっことじ | 【 / 】 |
 
 ### 設定
 
-`config.json`（初回起動時に自動作成）を編集:
+トレイの「設定を開く」、または `config.json`（`%LOCALAPPDATA%\VoiceToText\config.json`）を編集:
 
 ```json
 {
-  "api_key": "gsk_...",              // Groq API キー（STT + LLM共用）
-  "hotkey": "f2",                     // 録音トグルのホットキー
-  "mode": "toggle",                  // "toggle"（トグル）または "push_to_talk"（押しっぱなし）
-  "language": "ja",                   // 言語コード
-  "use_llm_cleanup": true,           // LLMによるテキスト整形（句読点・フィラー除去）
-  "llm_provider": "groq",            // "groq"（高速・無料）または "gemini"（高精度）
-  "groq_llm_model": "llama-3.1-8b-instant",  // Groq LLMモデル
-  "gemini_api_key": ""               // Gemini APIキー（オプション）
+  "api_key": "gsk_...",                      // Groq API キー（STT + 校正LLM 共用）
+  "hotkey": "f2",                             // 録音トグルのホットキー
+  "mode": "toggle",                          // "toggle" または "push_to_talk"
+  "language": "ja",                           // 言語コード
+  "use_llm_cleanup": true,                   // AI校正（漢字修正・句読点・フィラー除去）
+  "llm_provider": "groq",                    // Groq 固定
+  "groq_llm_model": "openai/gpt-oss-20b",    // 校正LLM（キャッシュ対応・推奨）
+  "stt_model": "whisper-large-v3-turbo",     // 認識モデル（turbo=高速 / whisper-large-v3=高精度）
+  "vocabulary": "",                           // よく使う固有名詞・専門用語（スペース区切り・精度向上）
+  "silence_threshold": 0.010,                // 無音判定のRMS閾値（小声を拾わない時は下げる）
+  "sounds_enabled": true                     // 効果音（録音開始/停止/完了）
 }
 ```
 
-### 音声認識プロバイダーの選択
+### 認識精度を上げるには
 
-| プロバイダー | 速度 | 料金 | 取得先 |
-|-------------|------|------|--------|
-| **Groq Whisper**（デフォルト） | 約0.3秒 | 無料（14,400回/日） | https://console.groq.com |
-| Gemini 2.5 Flash | 約2.5秒 | 約$0.0015/分 | https://aistudio.google.com/apikey |
-| OpenAI Whisper | 約1-2秒 | $0.006/分 | https://platform.openai.com |
-
-プロバイダーを変更するには `config.json` の `api_key` を変更してください。
+1. **ユーザー辞書**（設定の「認識精度」欄）— 固有名詞・専門用語を登録すると Whisper が正しい表記を選びやすくなる（最も安全で的確）
+2. **AI校正モード**（既定ON）— 文脈から誤変換の漢字を自動修正
+3. **認識モデルを `whisper-large-v3` に**（設定）— 基礎精度がわずかに向上
 
 ### exe化（Windows）
 
 ```bash
 build.bat
 ```
+出力: `dist\VoiceToText.exe`（約89MB）
 
-出力: `dist\VoiceToText.exe`
-
-### インストール（他のPCへ配布）
-
-1. `build.bat` を実行してexeを生成
-2. `install.bat` を実行 → デスクトップに「Voice to Text」ショートカットが作成
-3. `config.json` にAPIキーを入力
-4. デスクトップの「Voice to Text」をダブルクリック
+> `pyinstaller` コマンドは PATH に無い場合があるため、`build.bat` は `python -m PyInstaller` を使用します。
 
 ### Windows の警告について
 
-初回起動時にWindowsの警告画面が表示されることがあります。これはコード署名されていないアプリに対する標準的な警告で、アプリ自体に問題があるわけではありません。
+未署名アプリのため初回起動時に警告が出ることがあります（アプリに問題はありません）。
 
-#### パターン1: SmartScreen（青い画面「WindowsによってPCが保護されました」）
-
-1. **「詳細情報」** をクリック
-2. **「実行」** ボタンをクリック
-3. 次回以降は表示されません
-
-#### パターン2: スマート アプリ コントロール（実行がブロックされる場合）
-
-Windows 11 でアプリが完全にブロックされる場合:
-
-1. ダウンロードしたファイル（exe / zip）を**右クリック** → **「プロパティ」**
-2. 下部の **「ブロックの解除」** にチェックを入れる → **「OK」**
-3. ZIPの場合は**解除後に再展開**してください
-
-それでもブロックされる場合（スマート アプリ コントロールが「評価」または「オン」の場合）:
-
-1. **設定** → **プライバシーとセキュリティ** → **Windows セキュリティ**
-2. **アプリとブラウザーの制御** → **スマート アプリ コントロールの設定**
-3. **「オフ」** に切り替え
-
-#### パターン3: 上記で解決しない場合（Pythonから直接実行）
-
-```bash
-pip install -r requirements.txt
-python main.py
-```
+- **SmartScreen（青い画面）**: 「詳細情報」→「実行」
+- **完全にブロックされる場合**: ファイルを右クリック → プロパティ → 「ブロックの解除」にチェック → OK（ZIPは解除後に再展開）
+- それでも不可なら、ソースから `python main.py` で実行してください
 
 > このアプリはオープンソースです。ソースコードはすべて公開されており、安全性を確認できます。
 
@@ -167,6 +139,7 @@ python main.py
 
 トレイアイコンを右クリック:
 - モード切替（Push-to-Talk / Toggle）
+- 文章整形 ON/OFF
 - 設定を開く
 - 自動起動 ON/OFF（Windowsログイン時）
 - 終了
@@ -175,181 +148,103 @@ python main.py
 
 ## English
 
-AQUA Voice inspired voice-to-text desktop application. Press a hotkey, speak, and your words are transcribed and inserted at the cursor position in any application.
+A SuperWhisper / Aqua Voice inspired voice-to-text desktop app. Press a hotkey, speak, and your words are transcribed, AI-corrected, and inserted at the cursor in any application. **Powered solely by Groq** (one API key).
 
 ### Features
 
-- **System-wide voice input** - Works in any app (Chrome, Word, VS Code, Slack, etc.)
-- **Fast transcription** - Groq Whisper API (~0.3s latency)
-- **Japanese optimized** - Excellent Japanese recognition with punctuation
-- **Voice commands** - Say "enter" for newline, "period" for punctuation
-- **Toggle mode** - Press F2 to start recording, press again to stop
-- **Floating button** - Always-on-screen mic + Enter buttons with glow ring. Drag to reposition
-- **System tray** - Runs quietly in the background
-- **Recording overlay** - Waveform visualization while recording
-- **Cross-platform** - Windows and macOS
+- **System-wide voice input** — Works in any app (Chrome, Word, VS Code, Slack, etc.)
+- **Fast** — ~0.3–0.5s via Groq Whisper. The mic is kept warm, so recording starts **the instant you press** (no open latency)
+- **Lightweight, fast launch** — torch removed; the exe is **~89MB** (was 339MB)
+- **AI correction mode** — Punctuation, filler removal, and **context-aware kanji homophone correction** (e.g. 成形→整形, 機械→機会). Cleanup runs on Groq `gpt-oss-20b` (prompt-cache eligible)
+- **Custom dictionary** — Register frequent names/jargon to bias Whisper toward correct spellings
+- **Voice commands** — Say "enter" for newline, "period" for punctuation (longest-match replacement)
+- **Modern floating button** — A teal/cyan vertical capsule at the bottom-right: mic (top) + Enter (bottom). Draggable, auto-pinned to the top of the z-order
+- **At-a-glance state** — Status dot (idle / listening / processing / done) + sound cues (start / stop / done)
+- **System tray** — Runs quietly in the background
+- **Recording overlay** — Live waveform while recording
 
-### Install (exe version - Recommended)
+### Install (exe — Recommended)
 
-1. Download **VoiceToText-v2.0.0.zip** from [Releases](https://github.com/zunovia/voice_to_text_01/releases)
+1. Download **VoiceToText-v3.0.0.zip** from [Releases](https://github.com/zunovia/voice_to_text_01/releases)
 2. Extract the ZIP to any folder
-3. Double-click `install.bat` to run
-4. A "Voice to Text" shortcut will be created on your desktop
+3. Double-click `install.bat`
+4. A "Voice to Text" shortcut is created on your desktop (OneDrive desktops handled correctly)
 5. Double-click the shortcut to launch
-6. On first launch, enter your Groq API Key in the setup dialog (see below)
+6. Enter your Groq API Key in the first-run dialog
 
-> **If SmartScreen warning appears:** Click "More info" → "Run anyway" (first time only)
+> **If SmartScreen appears:** Click "More info" → "Run anyway" (first time only)
 
 ### Quick Start (from source)
 
-#### 1. Install Python 3.10+
-
-#### 2. Install dependencies
 ```bash
-pip install -r requirements.txt
-```
-
-#### 3. Get a Groq API Key (Free)
-
-1. Go to https://console.groq.com
-2. Sign up with Google account
-3. Click **API Keys** in the left menu
-4. Click **Create API Key**
-5. Copy the key (starts with `gsk_...`)
-
-Groq free tier: **14,400 requests/day** (practically unlimited for personal use).
-
-#### 4. Run
-```bash
+pip install -r requirements.txt   # torch / silero-vad no longer required
 python main.py
 ```
 
-On first launch, enter your Groq API Key in the setup dialog.
+Get a free Groq API key at https://console.groq.com (API Keys → Create API Key). Free tier: 2,000 STT req/day + 14,400 LLM req/day.
 
-**Windows:** Double-click `VoiceToText.vbs` to run without console window.
+**Windows:** double-click `VoiceToText.vbs` to run without a console window.
 
-#### 5. Use
+#### Use
 
-- **F2** (or Fn+F2) - Toggle recording on/off
+- **F2** (or Fn+F2) — toggle recording (sound cue + button turns coral)
 - Speak naturally
-- Text is inserted at cursor position
+- Press **F2** again — transcribe + correct → inserted at the cursor
 
 #### Floating Button
 
-A floating button panel appears at the bottom-right of your screen, visible on any background thanks to a glow ring design.
+A teal/cyan **vertical capsule** at the bottom-right:
 
-- **Mic button** (top) - Click to start/stop recording (same as F2)
-- **Enter button** (bottom) - Click to send Enter key (useful for sending chat messages)
-- **Drag** - Move both buttons together anywhere on screen
-- Button and ring turn **red** while recording
-- Hotkey label updates automatically when changed in settings
-- Clicking the buttons does **not** steal focus from your active app
-
-### Voice Commands
-
-| Say | Output |
-|-----|--------|
-| エンター / 改行 | Enter (newline) |
-| まる / ピリオド | 。 |
-| てん / カンマ | 、 |
-| かっこ | （ |
-| かっことじ | ） |
-| かぎかっこ | 「 |
-| かぎかっことじ | 」 |
+- **Mic (top)** — click to start/stop recording (same as F2); turns **coral** while recording
+- **Enter bar (bottom, lighter slate)** — click to send the Enter key; the color difference makes the two halves easy to tell apart
+- **Drag** to reposition; it auto-returns to the top even over fullscreen apps
+- Clicking does **not** steal focus from your active app
 
 ### Configuration
 
-Edit `config.json` (created on first run):
+Edit `config.json` (`%LOCALAPPDATA%\VoiceToText\config.json`) or use the Settings window:
 
 ```json
 {
-  "api_key": "gsk_...",              // Groq API key (STT + LLM shared)
-  "hotkey": "f2",                     // Hotkey to toggle recording
-  "mode": "toggle",                  // "toggle" or "push_to_talk"
-  "language": "ja",                   // Language code
-  "use_llm_cleanup": true,           // LLM text formatting (punctuation, filler removal)
-  "llm_provider": "groq",            // "groq" (fast, free) or "gemini" (accurate)
-  "groq_llm_model": "llama-3.1-8b-instant",  // Groq LLM model
-  "gemini_api_key": ""               // Gemini API key (optional)
+  "api_key": "gsk_...",                      // Groq API key (STT + cleanup LLM)
+  "hotkey": "f2",
+  "mode": "toggle",                          // "toggle" or "push_to_talk"
+  "language": "ja",
+  "use_llm_cleanup": true,                   // AI correction (kanji fix, punctuation, filler)
+  "llm_provider": "groq",
+  "groq_llm_model": "openai/gpt-oss-20b",    // cleanup model (cached, recommended)
+  "stt_model": "whisper-large-v3-turbo",     // turbo (fast) or whisper-large-v3 (accurate)
+  "vocabulary": "",                           // space-separated names/jargon to improve accuracy
+  "silence_threshold": 0.010,                // RMS gate for empty-recording detection
+  "sounds_enabled": true
 }
 ```
 
-### Alternative STT Providers
+### Improving accuracy
 
-| Provider | Speed | Cost | Setup |
-|----------|-------|------|-------|
-| **Groq Whisper** (default) | ~0.3s | Free (14,400 req/day) | https://console.groq.com |
-| Gemini 2.5 Flash | ~2.5s | ~$0.0015/min | https://aistudio.google.com/apikey |
-| OpenAI Whisper | ~1-2s | $0.006/min | https://platform.openai.com |
-
-To switch providers, change `api_key` in `config.json`.
+1. **Custom dictionary** (Settings → Accuracy) — safest, most targeted
+2. **AI correction mode** (on by default) — fixes contextual kanji errors
+3. **Switch STT model to `whisper-large-v3`** for slightly higher accuracy
 
 ### Build Executable (Windows)
 
 ```bash
-build.bat
+build.bat   # uses "python -m PyInstaller"; output: dist/VoiceToText.exe (~89MB)
 ```
-
-Output: `dist/VoiceToText.exe`
-
-### Install (distribute to other PCs)
-
-1. Run `build.bat` to generate exe
-2. Run `install.bat` to create desktop shortcut "Voice to Text"
-3. Edit `config.json` with your API key
-4. Double-click "Voice to Text" on desktop
-
-### Windows Security Warnings
-
-On first launch, Windows may show a warning. This is standard for unsigned apps and does not indicate any problem.
-
-#### Pattern 1: SmartScreen (blue "Windows protected your PC" screen)
-
-1. Click **"More info"**
-2. Click **"Run anyway"**
-3. Won't appear again after this
-
-#### Pattern 2: Smart App Control (app is completely blocked)
-
-On Windows 11, the app may be blocked entirely:
-
-1. **Right-click** the downloaded file (exe/zip) → **"Properties"**
-2. Check **"Unblock"** at the bottom → **"OK"**
-3. If ZIP, **re-extract after unblocking**
-
-If still blocked (Smart App Control is set to "Evaluation" or "On"):
-
-1. **Settings** → **Privacy & Security** → **Windows Security**
-2. **App & browser control** → **Smart App Control settings**
-3. Switch to **"Off"**
-
-#### Pattern 3: If none of the above works (run from source)
-
-```bash
-pip install -r requirements.txt
-python main.py
-```
-
-> This app is open source. All source code is publicly available for review.
-
-### System Tray Menu
-
-Right-click the tray icon for:
-- Mode toggle (Push-to-Talk / Toggle)
-- Settings
-- Auto-start on Windows login (ON/OFF)
-- Quit
 
 ---
 
 ## Tech Stack
 
-- **STT**: Groq Whisper Large V3 Turbo (+ optional Gemini cleanup)
-- **Audio**: sounddevice (16kHz mono)
-- **VAD**: Silero VAD (silence removal)
+- **STT**: Groq Whisper Large V3 Turbo (`verbose_json` segment filtering to suppress hallucinations)
+- **AI cleanup / correction**: Groq `gpt-oss-20b` (prompt caching, `reasoning_effort=low`)
+- **Audio**: sounddevice (16kHz mono, warm/persistent stream for zero-latency start)
+- **Empty-detection**: lightweight numpy RMS energy gate (no torch / Silero)
 - **Hotkey**: pynput (global hotkey)
-- **Text Insert**: pyperclip + pyautogui (clipboard paste)
-- **UI**: pystray (system tray) + tkinter (overlay/settings)
+- **Text insert**: pyperclip + pyautogui (clipboard paste)
+- **UI**: pystray (tray) + tkinter (overlay / capsule button / settings)
+- **Sound cues**: winsound + numpy-synthesized WAVs (no extra dependency)
+- **Packaging**: PyInstaller (onefile)
 
 ## License
 

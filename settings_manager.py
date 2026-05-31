@@ -28,11 +28,19 @@ log.info(f"APP_DIR={APP_DIR}, CONFIG_PATH={CONFIG_PATH}, frozen={getattr(sys, 'f
 
 DEFAULT_CONFIG = {
     "api_key": "",
-    "gemini_api_key": "",
-    "use_gemini_cleanup": False,
     "use_llm_cleanup": True,
     "llm_provider": "groq",
-    "groq_llm_model": "llama-3.1-8b-instant",
+    # gpt-oss-20b is the only Groq cleanup model with prompt caching (fixed
+    # CLEANUP_PROMPT cached at 50% off + faster TTFT). See API policy.
+    "groq_llm_model": "openai/gpt-oss-20b",
+    # STT model: turbo (fast, default) or whisper-large-v3 (highest accuracy).
+    "stt_model": "whisper-large-v3-turbo",
+    # Custom vocabulary / proper nouns fed to Whisper as a prompt bias.
+    "vocabulary": "",
+    # Peak-RMS gate (0..1) below which a recording is treated as silent/empty.
+    "silence_threshold": 0.010,
+    # Play short UI sound effects on record start/stop/done.
+    "sounds_enabled": True,
     "hotkey": "f2",
     "mode": "toggle",
     "language": "ja",
@@ -75,14 +83,13 @@ def load_config() -> dict:
                 **DEFAULT_CONFIG["voice_commands"],
                 **config.get("voice_commands", {}),
             }
-            # Migration: use_gemini_cleanup -> use_llm_cleanup
+            # Migration: old use_gemini_cleanup -> use_llm_cleanup. Gemini support
+            # was removed, so the provider is always Groq now.
             if "use_llm_cleanup" not in config and config.get("use_gemini_cleanup", False):
                 merged["use_llm_cleanup"] = True
-                if config.get("gemini_api_key", ""):
-                    merged["llm_provider"] = "gemini"
-                else:
-                    merged["llm_provider"] = "groq"
-                log.info("Migrated use_gemini_cleanup -> use_llm_cleanup")
+            merged["llm_provider"] = "groq"
+            merged.pop("gemini_api_key", None)
+            merged.pop("use_gemini_cleanup", None)
             return merged
         except Exception as e:
             log.error(f"Failed to load config: {e}")

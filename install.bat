@@ -6,8 +6,11 @@ echo  ========================================
 echo.
 
 set "INSTALL_DIR=%LOCALAPPDATA%\VoiceToText"
-set "DESKTOP=%USERPROFILE%\Desktop"
 set "SOURCE=%~dp0"
+
+:: Resolve the REAL Desktop (handles OneDrive redirection & localized names).
+set "DESKTOP=%USERPROFILE%\Desktop"
+for /f "usebackq delims=" %%D in (`powershell -NoProfile -Command "[Environment]::GetFolderPath('DesktopDirectory')"`) do set "DESKTOP=%%D"
 
 :: Check if exe exists; if not, guide user to source-based usage
 if not exist "%SOURCE%dist\VoiceToText.exe" (

@@ -8,3 +8,9 @@ config.json
 voicetotext.log
 .lock
 .env
+# Release / build artifacts (large binaries — distributed via GitHub Releases)
+*.zip
+release/
+release_v3/
+sounds/
+tmp*.json

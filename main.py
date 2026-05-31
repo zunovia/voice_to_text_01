@@ -30,6 +30,39 @@ def _get_resource_dir():
     return APP_DIR
 
 RESOURCE_DIR = _get_resource_dir()
+
+
+def _get_desktop_dir():
+    """Resolve the REAL Desktop folder.
+
+    Handles OneDrive redirection and localized names (e.g. "デスクトップ"),
+    which a hard-coded %USERPROFILE%\\Desktop misses — the shortcut would then
+    land in a hidden folder and never appear on the visible desktop.
+    """
+    try:
+        import winreg
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders",
+        ) as key:
+            val, _ = winreg.QueryValueEx(key, "Desktop")
+            val = os.path.expandvars(val)
+            if val and os.path.isdir(val):
+                return val
+    except Exception:
+        pass
+    up = os.environ.get("USERPROFILE", os.path.expanduser("~"))
+    for cand in (
+        os.path.join(up, "OneDrive", "Desktop"),
+        os.path.join(up, "OneDrive", "デスクトップ"),
+        os.path.join(up, "Desktop"),
+        os.path.join(up, "デスクトップ"),
+    ):
+        if os.path.isdir(cand):
+            return cand
+    return os.path.join(up, "Desktop")
+
+
 LOG_PATH = os.path.join(APP_DIR, "voicetotext.log")
 logging.basicConfig(
     level=logging.INFO,
@@ -68,6 +101,7 @@ try:
     from tray_app import TrayApp
     from overlay import RecordingOverlay
     from settings_gui import SettingsGUI
+    import sounds
 except ImportError as e:
     log.error(f"Import error: {e}")
     show_error("Voice-to-Text Error", f"Missing dependency:\n{e}\n\nRun: pip install -r requirements.txt")
@@ -77,7 +111,11 @@ except ImportError as e:
 class VoiceToTextApp:
     def __init__(self):
         self.config = load_config()
-        self.recorder = AudioRecorder(sample_rate=self.config.get("sample_rate", 16000))
+        self.recorder = AudioRecorder(
+            sample_rate=self.config.get("sample_rate", 16000),
+            silence_threshold=self.config.get("silence_threshold", 0.010),
+        )
+        sounds.set_enabled(self.config.get("sounds_enabled", True))
         self.transcriber = None
         self.inserter = TextInserter(self.config.get("voice_commands", {}))
         self.hotkey_manager = None
@@ -105,27 +143,27 @@ class VoiceToTextApp:
         splash.show()
         splash.update("Initializing...")
 
-        # Initialize transcriber
+        # Initialize transcriber (Groq only)
         try:
-            gemini_key = self.config.get("gemini_api_key", "")
-            llm_provider = self.config.get("llm_provider", "groq")
-            groq_llm_model = self.config.get("groq_llm_model", "llama-3.1-8b-instant")
             self.transcriber = Transcriber(
                 self.config["api_key"],
-                gemini_api_key=gemini_key,
-                llm_provider=llm_provider,
-                groq_llm_model=groq_llm_model,
+                groq_llm_model=self.config.get("groq_llm_model", "openai/gpt-oss-20b"),
+                stt_model=self.config.get("stt_model", "whisper-large-v3-turbo"),
+                vocabulary=self.config.get("vocabulary", ""),
             )
-            splash.update("Loading voice detection...")
+            splash.update("Initializing...")
         except Exception as e:
             splash.close()
             log.error(f"Failed to init transcriber: {e}")
             show_error("Voice-to-Text Error", f"Failed to initialize:\n{e}")
             sys.exit(1)
 
-        # Pre-load Silero VAD in background (avoids 1s delay on first recording)
-        import threading
-        threading.Thread(target=self._preload_vad, daemon=True).start()
+        # Pre-generate UI sound files in the background (no first-cue delay).
+        sounds.prewarm()
+
+        # Pre-open the mic in the background so the FIRST recording is instant
+        # (avoids the ~300-400 ms sd.InputStream open latency on each press).
+        threading.Thread(target=self.recorder.arm, daemon=True).start()
 
         lang = self.config.get("language", "ja")
 
@@ -154,8 +192,6 @@ class VoiceToTextApp:
         self._setup_hotkey()
 
         splash.update("Ready!")
-        import time
-        time.sleep(0.5)
         splash.close()
 
         # Setup and run system tray (blocks main thread)
@@ -195,9 +231,6 @@ class VoiceToTextApp:
             if result_data.get("groq_key"):
                 self.config["api_key"] = result_data["groq_key"]
                 self.config["language"] = current_lang
-                if result_data.get("gemini_key"):
-                    self.config["gemini_api_key"] = result_data["gemini_key"]
-                    self.config["use_gemini_cleanup"] = True
                 success = save_config(self.config)
                 if success:
                     log.info(f"API Keys saved to {CONFIG_PATH}")
@@ -209,7 +242,7 @@ class VoiceToTextApp:
     def _show_setup_dialog(self, L) -> dict | None:
         """Show setup dialog. Returns dict with keys, or None if language switched."""
         import webbrowser
-        result = {"groq_key": "", "gemini_key": "", "lang_switched": False}
+        result = {"groq_key": "", "lang_switched": False}
 
         BG = "#1a1a2e"
         CARD = "#16213e"
@@ -218,7 +251,7 @@ class VoiceToTextApp:
 
         root = tk.Tk()
         root.title("Voice to Text")
-        root.geometry("520x560")
+        root.geometry("520x430")
         root.resizable(False, False)
         root.attributes("-topmost", True)
         root.configure(bg=BG)
@@ -232,8 +265,8 @@ class VoiceToTextApp:
 
         root.update_idletasks()
         x = (root.winfo_screenwidth() - 520) // 2
-        y = (root.winfo_screenheight() - 560) // 2
-        root.geometry(f"520x560+{x}+{y}")
+        y = (root.winfo_screenheight() - 430) // 2
+        root.geometry(f"520x430+{x}+{y}")
         root.lift()
         root.focus_force()
 
@@ -290,31 +323,6 @@ class VoiceToTextApp:
         tk.Label(groq_card, text=t("setup_groq_steps", L),
                  font=("Segoe UI", 8), fg="#666666", bg=CARD).pack(anchor="w")
 
-        # === Gemini Card ===
-        gemini_card = tk.Frame(main, bg=CARD, padx=15, pady=12)
-        gemini_card.pack(fill="x", pady=(0, 10))
-
-        gemini_header = tk.Frame(gemini_card, bg=CARD)
-        gemini_header.pack(fill="x", pady=(0, 5))
-        tk.Label(gemini_header, text=t("setup_gemini_title", L), font=("Segoe UI", 11, "bold"),
-                 fg="#FFA726", bg=CARD).pack(side="left")
-        gemini_link = tk.Label(gemini_header, text=t("setup_groq_link", L), font=("Segoe UI", 9, "underline"),
-                               fg=HIGHLIGHT, bg=CARD, cursor="hand2")
-        gemini_link.pack(side="right")
-        gemini_link.bind("<Button-1>", lambda e: webbrowser.open("https://aistudio.google.com/apikey"))
-
-        tk.Label(gemini_card, text=t("setup_gemini_desc", L), font=("Segoe UI", 9),
-                 fg="#888888", bg=CARD).pack(anchor="w", pady=(0, 5))
-
-        gemini_var = tk.StringVar()
-        gemini_entry = tk.Entry(gemini_card, textvariable=gemini_var, width=55,
-                                bg="#2a2a4a", fg="#FFFFFF", insertbackground="#FFFFFF",
-                                relief="flat", font=("Consolas", 10))
-        gemini_entry.pack(fill="x", pady=(0, 5))
-
-        tk.Label(gemini_card, text=t("setup_gemini_optional", L),
-                 font=("Segoe UI", 8), fg="#666666", bg=CARD).pack(anchor="w")
-
         # === Buttons ===
         btn_frame = tk.Frame(main, bg=BG)
         btn_frame.pack(pady=(15, 0))
@@ -325,7 +333,6 @@ class VoiceToTextApp:
                 messagebox.showwarning("Warning", t("setup_groq_required", L), parent=root)
                 return
             result["groq_key"] = key
-            result["gemini_key"] = gemini_var.get().strip()
             root.destroy()
 
         def on_cancel():
@@ -377,48 +384,78 @@ class VoiceToTextApp:
     def _on_recording_start(self):
         log.info("Recording started...")
         L = self.config.get("language", "ja")
-        self.recorder.start()
+        # Instant feedback FIRST so pressing feels immediate; the mic stream is
+        # kept warm (recorder.arm), so start() below is ~0 ms instead of ~300 ms.
+        if self.overlay:
+            self.overlay.set_state("listening")
+            self.overlay.show(t("recording", L))
         if self.tray:
             self.tray.set_recording(True)
-        if self.overlay:
-            self.overlay.show(t("recording", L))
+        sounds.play("start")
+        self.recorder.start()
 
     def _on_recording_stop(self):
+        import time
         log.info("Recording stopped. Processing...")
+        L = self.config.get("language", "ja")
         wav_data = self.recorder.stop()
         duration = self.recorder.get_duration()
+        sounds.play("stop")
+
+        # Nothing usable (too short or silent — RMS gate returned b"")
+        if not wav_data or duration < 0.3:
+            log.info("Recording too short or silent, skipping.")
+            sounds.play("empty")
+            if self.tray:
+                self.tray.set_recording(False)
+            if self.overlay:
+                self.overlay.set_state("empty")
+                time.sleep(0.4)
+                self.overlay.set_state("idle")
+                self.overlay.hide()
+            return
 
         if self.tray:
             self.tray.set_processing()
         if self.overlay:
-            self.overlay.update_text(t("processing", self.config.get("language", "ja")))
+            self.overlay.set_state("processing")
+            self.overlay.update_text(t("transcribing", L))
 
-        if not wav_data or duration < 0.3:
-            log.info("Recording too short, skipping.")
-            if self.tray:
-                self.tray.set_recording(False)
-            if self.overlay:
-                self.overlay.hide()
-            return
+        def _on_phase(phase):
+            if not self.overlay:
+                return
+            if phase == "cleanup":
+                self.overlay.update_text(t("cleaning", L))
+            else:
+                self.overlay.update_text(t("transcribing", L))
 
         try:
             use_cleanup = self.config.get("use_llm_cleanup", self.config.get("use_gemini_cleanup", False))
-            text = self.transcriber.transcribe(wav_data, use_cleanup=use_cleanup)
+            text = self.transcriber.transcribe(wav_data, use_cleanup=use_cleanup, on_phase=_on_phase)
             if text:
                 log.info(f"Transcribed: {text}")
                 self.inserter.process_and_insert(text)
+                sounds.play("done")
+                if self.overlay:
+                    self.overlay.set_state("done")
+                    time.sleep(0.4)
             else:
                 log.info("No text transcribed.")
+                sounds.play("empty")
+                if self.overlay:
+                    self.overlay.set_state("empty")
+                    time.sleep(0.4)
         except Exception as e:
             log.error(f"Transcription error: {e}")
             if self.overlay:
-                self.overlay.update_text(t("error", self.config.get("language", "ja")))
-                import time
+                self.overlay.set_state("error")
+                self.overlay.update_text(t("error", L))
                 time.sleep(1)
         finally:
             if self.tray:
                 self.tray.set_recording(False)
             if self.overlay:
+                self.overlay.set_state("idle")
                 self.overlay.hide()
 
     def _show_settings(self):
@@ -435,15 +472,15 @@ class VoiceToTextApp:
         # Recreate transcriber with new settings
         if self.transcriber:
             self.transcriber.close()
-        gemini_key = new_config.get("gemini_api_key", "")
-        llm_provider = new_config.get("llm_provider", "groq")
-        groq_llm_model = new_config.get("groq_llm_model", "llama-3.1-8b-instant")
+        llm_provider = "groq"
         self.transcriber = Transcriber(
             new_config["api_key"],
-            gemini_api_key=gemini_key,
-            llm_provider=llm_provider,
-            groq_llm_model=groq_llm_model,
+            groq_llm_model=new_config.get("groq_llm_model", "openai/gpt-oss-20b"),
+            stt_model=new_config.get("stt_model", "whisper-large-v3-turbo"),
+            vocabulary=new_config.get("vocabulary", ""),
         )
+        self.recorder.silence_threshold = new_config.get("silence_threshold", 0.010)
+        sounds.set_enabled(new_config.get("sounds_enabled", True))
         self.inserter.update_voice_commands(new_config.get("voice_commands", {}))
         self._setup_hotkey()
         if self.tray:
@@ -457,15 +494,6 @@ class VoiceToTextApp:
             use_llm = new_config.get("use_llm_cleanup", new_config.get("use_gemini_cleanup", False))
             self.overlay.set_llm_state(use_llm, llm_provider)
         log.info(f"Settings updated. Hotkey: {new_config['hotkey']}, Mode: {new_config['mode']}")
-
-    def _preload_vad(self):
-        """Pre-load Silero VAD model in background to avoid delay on first recording."""
-        try:
-            from recorder import _get_vad_model
-            _get_vad_model()
-            log.info("VAD pre-loaded successfully")
-        except Exception as e:
-            log.warning(f"VAD pre-load failed: {e}")
 
     def _toggle_mode(self):
         current = self.config.get("mode", "push_to_talk")
@@ -485,17 +513,15 @@ class VoiceToTextApp:
         self.config["use_gemini_cleanup"] = new_val  # keep in sync for backward compat
         save_config(self.config)
 
-        llm_provider = self.config.get("llm_provider", "groq")
-        # Update transcriber (close old client to release connections)
+        llm_provider = "groq"
+        # Update transcriber
         if self.transcriber:
             self.transcriber.close()
-        gemini_key = self.config.get("gemini_api_key", "")
-        groq_llm_model = self.config.get("groq_llm_model", "llama-3.1-8b-instant")
         self.transcriber = Transcriber(
             self.config["api_key"],
-            gemini_api_key=gemini_key,
-            llm_provider=llm_provider,
-            groq_llm_model=groq_llm_model,
+            groq_llm_model=self.config.get("groq_llm_model", "openai/gpt-oss-20b"),
+            stt_model=self.config.get("stt_model", "whisper-large-v3-turbo"),
+            vocabulary=self.config.get("vocabulary", ""),
         )
         if self.tray:
             self.tray.set_llm_cleanup(new_val, llm_provider)
@@ -510,7 +536,7 @@ class VoiceToTextApp:
     def _ensure_desktop_shortcut(self):
         """Create a desktop shortcut if one doesn't exist (frozen exe only)."""
         try:
-            desktop = os.path.join(os.environ.get("USERPROFILE", ""), "Desktop")
+            desktop = _get_desktop_dir()
             shortcut_path = os.path.join(desktop, "Voice to Text.lnk")
             if os.path.exists(shortcut_path):
                 return  # Already exists
@@ -547,6 +573,8 @@ class VoiceToTextApp:
         log.info("Shutting down...")
         if self.hotkey_manager:
             self.hotkey_manager.stop()
+        if self.recorder:
+            self.recorder.close()
         if self.overlay:
             self.overlay.destroy()
 

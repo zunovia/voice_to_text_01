@@ -8,20 +8,26 @@ from i18n import t
 class FloatingButton:
     """Always-visible floating buttons: mic toggle + Enter key."""
 
-    BTN_SIZE = 60
-    ENTER_H = 34
-    GAP = 5
-    # Soft pastel-dark palette
-    COLOR_IDLE = "#3E3B5C"
-    COLOR_IDLE_HOVER = "#524E75"
-    COLOR_IDLE_RING = "#6C63FF"
-    COLOR_RECORDING = "#C62828"
-    COLOR_RECORDING_HOVER = "#E53935"
-    COLOR_RECORDING_RING = "#FF8A80"
-    COLOR_ENTER = "#2E4A3E"
-    COLOR_ENTER_HOVER = "#3E5F50"
-    COLOR_ENTER_PRESS = "#4E7562"
-    COLOR_ENTER_RING = "#66BB6A"
+    # Unified vertical capsule: mic (top) + Enter (bottom). Teal / cyan theme.
+    W = 64            # capsule width
+    MIC_H = 58        # mic section height
+    ENTER_H = 32      # enter section height
+    MARGIN = 5        # space for shadow / ring glow
+    RADIUS = 20       # corner radius
+    ACCENT = "#2DD4BF"         # teal accent (idle ring)
+    ACCENT_SOFT = "#1C7E73"    # dim teal (idle mic inner ring)
+    ACCENT_BRIGHT = "#5EEAD4"  # pressed (idle)
+    REC = "#FB7185"            # coral/pink (recording)
+    REC_BRIGHT = "#FDA4AF"     # pressed (recording)
+    BODY = "#1B232B"           # dark slate (mic section)
+    ENTER_FILL = "#33424E"     # lighter slate bar (Enter section) — clearly distinct
+    ENTER_HOVER = "#3E4F5C"
+    ENTER_PRESS = "#4A5D6B"
+    ENTER_TEXT = "#FFFFFF"
+    DIVIDER = "#33414A"
+    SHADOW = "#0E1318"
+    TEXT = "#D7F5EF"
+    TEXT_DIM = "#8FA6A1"
     DRAG_THRESHOLD = 4
     MIC_ICON = "\U0001F3A4"
 
@@ -29,9 +35,11 @@ class FloatingButton:
         self._root = root
         self._on_click = on_click
         self._recording = False
+        self._hover = None
+        self._hotkey_label = hotkey_label
 
-        win_w = self.BTN_SIZE + 8  # extra space for glow ring
-        win_h = self.BTN_SIZE + 8 + self.GAP + self.ENTER_H
+        cw = self.W + 2 * self.MARGIN
+        ch = self.MIC_H + self.ENTER_H + 2 * self.MARGIN
 
         self._win = tk.Toplevel(root)
         self._win.overrideredirect(True)
@@ -40,114 +48,140 @@ class FloatingButton:
 
         # Prevent focus stealing on click (Windows WS_EX_NOACTIVATE)
         self._win.update_idletasks()
-        hwnd = ctypes.windll.user32.GetParent(self._win.winfo_id())
+        user32 = ctypes.windll.user32
+        hwnd = user32.GetParent(self._win.winfo_id())
+        self._hwnd = hwnd
+        self._user32 = user32
         GWL_EXSTYLE = -20
         WS_EX_NOACTIVATE = 0x08000000
         WS_EX_APPWINDOW = 0x00040000
-        style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+        style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
         style = (style | WS_EX_NOACTIVATE) & ~WS_EX_APPWINDOW
-        ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+        user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+        # Use pointer-sized args so HWND_TOPMOST (-1) isn't truncated on 64-bit.
+        try:
+            user32.SetWindowPos.argtypes = [
+                ctypes.c_void_p, ctypes.c_void_p,
+                ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint,
+            ]
+            user32.SetWindowPos.restype = ctypes.c_bool
+        except Exception:
+            pass
 
         self._win.configure(bg="#010101")
         self._win.attributes("-transparentcolor", "#010101")
 
-        # Mic button canvas (top) — bigger for glow ring
-        mic_canvas_size = self.BTN_SIZE + 8
+        # Single canvas holds the whole capsule (mic on top, Enter on bottom)
         self._canvas = tk.Canvas(
-            self._win, width=mic_canvas_size, height=mic_canvas_size,
+            self._win, width=cw, height=ch,
             bg="#010101", highlightthickness=0, cursor="hand2",
         )
         self._canvas.pack()
-
-        # Enter button canvas (bottom)
-        self._enter_canvas = tk.Canvas(
-            self._win, width=win_w, height=self.ENTER_H,
-            bg="#010101", highlightthickness=0, cursor="hand2",
-        )
-        self._enter_canvas.pack(pady=(self.GAP, 0))
-
-        self._hotkey_label = hotkey_label
-        self._draw_mic_button()
-        self._draw_enter_button()
+        self._draw()
 
         # Position: bottom-right, above overlay area
         self._win.update_idletasks()
         screen_w = self._win.winfo_screenwidth()
         screen_h = self._win.winfo_screenheight()
-        x = screen_w - win_w - 16
-        y = screen_h - win_h - 180
-        self._win.geometry(f"{win_w}x{win_h}+{x}+{y}")
+        x = screen_w - cw - 16
+        y = screen_h - ch - 180
+        self._win.geometry(f"{cw}x{ch}+{x}+{y}")
 
-        # Drag support (shared for whole window)
+        # Drag support
         self._drag_start_x = 0
         self._drag_start_y = 0
         self._win_start_x = 0
         self._win_start_y = 0
         self._dragged = False
 
-        # Mic button events
-        self._canvas.bind("<ButtonPress-1>", self._on_mic_press)
+        self._canvas.bind("<ButtonPress-1>", self._on_press)
         self._canvas.bind("<B1-Motion>", self._on_motion)
-        self._canvas.bind("<ButtonRelease-1>", self._on_mic_release)
-        self._canvas.bind("<Enter>", self._on_mic_enter)
-        self._canvas.bind("<Leave>", self._on_mic_leave)
+        self._canvas.bind("<ButtonRelease-1>", self._on_release)
+        self._canvas.bind("<Motion>", self._on_hover)
+        self._canvas.bind("<Leave>", self._on_leave)
 
-        # Enter button events
-        self._enter_canvas.bind("<ButtonPress-1>", self._on_enter_press)
-        self._enter_canvas.bind("<B1-Motion>", self._on_motion)
-        self._enter_canvas.bind("<ButtonRelease-1>", self._on_enter_release)
-        self._enter_canvas.bind("<Enter>", self._on_enter_hover_in)
-        self._enter_canvas.bind("<Leave>", self._on_enter_hover_out)
+        # Windows can let a newer topmost / fullscreen window slip above ours,
+        # so re-pin to the top of the z-order periodically (without stealing focus).
+        self._win.after(1500, self._keep_on_top)
+
+    def _keep_on_top(self):
+        """Re-assert HWND_TOPMOST without activating/stealing focus."""
+        try:
+            HWND_TOPMOST = ctypes.c_void_p(-1)
+            SWP_NOSIZE = 0x0001
+            SWP_NOMOVE = 0x0002
+            SWP_NOACTIVATE = 0x0010
+            self._user32.SetWindowPos(
+                self._hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            )
+        except Exception:
+            pass
+        try:
+            self._win.after(1500, self._keep_on_top)
+        except (RuntimeError, tk.TclError):
+            pass
 
     # --- Drawing ---
 
-    def _draw_mic_button(self, color=None):
-        if color is None:
-            color = self.COLOR_RECORDING if self._recording else self.COLOR_IDLE
-        ring = self.COLOR_RECORDING_RING if self._recording else self.COLOR_IDLE_RING
-        c = self._canvas
-        s = self.BTN_SIZE + 8  # canvas size
-        c.delete("all")
-        # Outer glow ring — visible on any background
-        c.create_oval(0, 0, s, s, fill="", outline=ring, width=3)
-        # Inner shadow
-        pad = 4
-        c.create_oval(pad + 1, pad + 1, s - pad + 1, s - pad + 1,
-                       fill="#1A1A2E", outline="")
-        # Main circle
-        c.create_oval(pad, pad, s - pad, s - pad,
-                       fill=color, outline="")
-        # Inner highlight (top-left shine)
-        c.create_arc(pad + 4, pad + 4, s - pad - 12, s - pad - 12,
-                      start=100, extent=60, fill="", outline="#FFFFFF",
-                      width=1, style="arc")
-        # Mic icon
-        cx, cy = s // 2, s // 2
-        c.create_text(cx, cy - 4,
-                       text=self.MIC_ICON, font=("Segoe UI Emoji", 16),
-                       fill="#FFFFFF")
-        # Hotkey label
-        c.create_text(cx, cy + 19,
-                       text=self._hotkey_label, font=("Segoe UI", 7, "bold"),
-                       fill="#DDDDDD")
+    def _section_at(self, y):
+        """Which half of the capsule a y-coordinate falls in."""
+        return "mic" if y < self.MARGIN + self.MIC_H else "enter"
 
-    def _draw_enter_button(self, color=None):
-        if color is None:
-            color = self.COLOR_ENTER
-        c = self._enter_canvas
+    def _draw(self, pressed=None):
+        c = self._canvas
         c.delete("all")
-        w = self.BTN_SIZE + 8
-        h = self.ENTER_H
-        r = 12
-        # Outer glow rounded rect
-        self._rounded_rect(c, 0, 0, w, h, r, fill="", outline=self.COLOR_ENTER_RING, width=2)
-        # Shadow
-        self._rounded_rect(c, 2, 2, w - 2, h - 1, r - 1, fill="#1A2E1A", outline="")
-        # Main body
-        self._rounded_rect(c, 1, 1, w - 1, h - 2, r - 1, fill=color, outline="")
-        # Enter label with arrow
-        c.create_text(w // 2, h // 2, text="Enter \u21B5",
-                       font=("Segoe UI", 9, "bold"), fill="#E0E0E0")
+        m = self.MARGIN
+        x0, y0 = m, m
+        x1 = m + self.W
+        y1 = m + self.MIC_H + self.ENTER_H
+        r = self.RADIUS
+        dy = y0 + self.MIC_H  # boundary between mic (top) and Enter (bottom)
+        rec = self._recording
+        ring = self.REC if rec else self.ACCENT
+        if pressed == "mic":
+            ring = self.REC_BRIGHT if rec else self.ACCENT_BRIGHT
+
+        if pressed == "enter":
+            enter_fill = self.ENTER_PRESS
+        elif self._hover == "enter":
+            enter_fill = self.ENTER_HOVER
+        else:
+            enter_fill = self.ENTER_FILL
+
+        # Soft drop shadow
+        self._rounded_rect(c, x0 + 1, y0 + 2, x1 + 1, y1 + 2, r, fill=self.SHADOW)
+        # Fill the whole capsule with the Enter (lighter) color first...
+        self._rounded_rect(c, x0, y0, x1, y1, r, fill=enter_fill)
+        # ...then lay the dark mic section over the top half (rounded top, square bottom)
+        self._rounded_rect(c, x0, y0, x1, dy, r, fill=self.BODY)
+        c.create_rectangle(x0, dy - r, x1, dy, fill=self.BODY, outline="")
+        # Outer accent ring + a crisp teal divider so the two halves read separately
+        self._rounded_rect(c, x0, y0, x1, y1, r, outline=ring, width=2)
+        c.create_line(x0 + 1, dy, x1 - 1, dy, fill=self.ACCENT, width=1)
+
+        # Mic section (dark + teal)
+        mcx = (x0 + x1) // 2
+        mcy = y0 + self.MIC_H // 2
+        rad = 18
+        if rec:
+            c.create_oval(mcx - rad, mcy - rad, mcx + rad, mcy + rad,
+                          fill=self.REC, outline="")
+        else:
+            inner = self.ACCENT if self._hover == "mic" else self.ACCENT_SOFT
+            c.create_oval(mcx - rad, mcy - rad, mcx + rad, mcy + rad,
+                          fill="", outline=inner, width=2)
+        c.create_text(mcx, mcy - 4, text=self.MIC_ICON,
+                      font=("Segoe UI Emoji", 17), fill="#FFFFFF")
+        c.create_text(mcx, mcy + 14, text=self._hotkey_label,
+                      font=("Segoe UI", 7, "bold"),
+                      fill="#FFFFFF" if rec else self.TEXT)
+
+        # Enter section (lighter bar + white label)
+        ecx = (x0 + x1) // 2
+        ecy = dy + self.ENTER_H // 2
+        c.create_text(ecx, ecy, text="Enter \u21B5",
+                      font=("Segoe UI", 9, "bold"), fill=self.ENTER_TEXT)
 
     @staticmethod
     def _rounded_rect(canvas, x0, y0, x1, y1, r, **kwargs):
@@ -170,11 +204,11 @@ class FloatingButton:
 
     def set_recording(self, recording: bool):
         self._recording = recording
-        self._draw_mic_button()
+        self._draw()
 
     def update_label(self, text: str):
         self._hotkey_label = text
-        self._draw_mic_button()
+        self._draw()
 
     def destroy(self):
         self._win.destroy()
@@ -198,43 +232,34 @@ class FloatingButton:
             new_y = self._win_start_y + dy
             self._win.geometry(f"+{new_x}+{new_y}")
 
-    # --- Mic button events ---
+    # --- Unified events (section chosen by click y) ---
 
-    def _on_mic_enter(self, event):
-        color = self.COLOR_RECORDING_HOVER if self._recording else self.COLOR_IDLE_HOVER
-        self._draw_mic_button(color)
-
-    def _on_mic_leave(self, event):
-        self._draw_mic_button()
-
-    def _on_mic_press(self, event):
+    def _on_press(self, event):
         self._start_drag(event)
-        bright = "#FF5252" if self._recording else "#6860A0"
-        self._draw_mic_button(bright)
+        self._draw(pressed=self._section_at(event.y))
 
-    def _on_mic_release(self, event):
-        if not self._dragged and self._on_click:
-            self._on_click()
-        self._draw_mic_button()
-
-    # --- Enter button events ---
-
-    def _on_enter_hover_in(self, event):
-        self._draw_enter_button(self.COLOR_ENTER_HOVER)
-
-    def _on_enter_hover_out(self, event):
-        self._draw_enter_button()
-
-    def _on_enter_press(self, event):
-        self._start_drag(event)
-        self._draw_enter_button(self.COLOR_ENTER_PRESS)
-
-    def _on_enter_release(self, event):
-        if not self._dragged:
-            self._draw_enter_button()
-            threading.Thread(target=self._send_enter, daemon=True).start()
+    def _on_release(self, event):
+        section = self._section_at(event.y)
+        was_dragged = self._dragged
+        self._draw()
+        if was_dragged:
+            return
+        if section == "mic":
+            if self._on_click:
+                self._on_click()
         else:
-            self._draw_enter_button()
+            threading.Thread(target=self._send_enter, daemon=True).start()
+
+    def _on_hover(self, event):
+        sec = self._section_at(event.y)
+        if sec != self._hover:
+            self._hover = sec
+            self._draw()
+
+    def _on_leave(self, event):
+        if self._hover is not None:
+            self._hover = None
+            self._draw()
 
     @staticmethod
     def _send_enter():
@@ -251,11 +276,22 @@ class RecordingOverlay:
     WAVE_COLOR_LOUD = "#FF7043"
     BG_COLOR = "#1E1E1E"
     BAR_COUNT = 40
+    # Single status dot color per pipeline state (SuperWhisper/Aqua-style cue).
+    STATE_COLORS = {
+        "idle": "#9E9E9E",
+        "listening": "#EF5350",   # red — recording
+        "processing": "#42A5F5",  # blue — transcribing / cleaning
+        "done": "#66BB6A",        # green — inserted
+        "empty": "#FFA726",       # orange — nothing captured
+        "error": "#FF7043",       # deep orange — failed
+    }
 
     def __init__(self, on_gemini_toggle=None, on_llm_toggle=None, lang="ja", on_button_click=None, hotkey_label="F2"):
         self._root = None
         self._canvas = None
         self._label = None
+        self._dot = None
+        self._state = "idle"
         self._gemini_btn = None
         self._float_btn = None
         self._visible = False
@@ -298,6 +334,22 @@ class RecordingOverlay:
                 self._root.after(0, lambda: self._label.config(text=text))
             except RuntimeError:
                 pass
+
+    def set_state(self, state: str):
+        """Set the status-dot color by pipeline state (thread-safe)."""
+        self._state = state
+        if self._root and self._dot:
+            try:
+                self._root.after(0, self._apply_state)
+            except RuntimeError:
+                pass  # mainloop not running yet; applied on next show()
+
+    def _apply_state(self):
+        if not self._dot:
+            return
+        color = self.STATE_COLORS.get(self._state, self.STATE_COLORS["idle"])
+        self._dot.delete("all")
+        self._dot.create_oval(2, 2, 12, 12, fill=color, outline="")
 
     def update_audio(self, level: float, waveform: list):
         self._levels.append(level)
@@ -364,9 +416,15 @@ class RecordingOverlay:
         main_frame = tk.Frame(self._root, bg=self.BG_COLOR, padx=10, pady=6)
         main_frame.pack(fill="both", expand=True)
 
-        # Top row: status label + Gemini button
+        # Top row: status dot + label + Gemini button
         top_frame = tk.Frame(main_frame, bg=self.BG_COLOR)
         top_frame.pack(fill="x")
+
+        self._dot = tk.Canvas(top_frame, width=14, height=14, bg=self.BG_COLOR,
+                              highlightthickness=0)
+        self._dot.pack(side="left", padx=(0, 6))
+        self._dot.create_oval(2, 2, 12, 12,
+                              fill=self.STATE_COLORS.get(self._state, "#9E9E9E"), outline="")
 
         self._label = tk.Label(
             top_frame,
@@ -458,6 +516,7 @@ class RecordingOverlay:
         if self._label:
             self._label.config(text=text)
         self._update_gemini_btn()
+        self._apply_state()
         if self._root:
             screen_w = self._root.winfo_screenwidth()
             screen_h = self._root.winfo_screenheight()

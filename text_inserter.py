@@ -57,10 +57,15 @@ class TextInserter:
             pass
 
     def _process_voice_commands(self, text: str) -> str:
-        """Replace voice command words with their corresponding characters."""
+        """Replace voice command words with their corresponding characters.
+
+        Process longest keys first so that a short key never clobbers a longer
+        one that contains it. e.g. without this, "かっことじ" (→ ）) would first
+        be hit by "かっこ" (→ （) and corrupt to "（とじ".
+        """
         result = text
-        for command, replacement in self.voice_commands.items():
-            result = result.replace(command, replacement)
+        for command in sorted(self.voice_commands, key=len, reverse=True):
+            result = result.replace(command, self.voice_commands[command])
         return result
 
     def update_voice_commands(self, voice_commands: dict):

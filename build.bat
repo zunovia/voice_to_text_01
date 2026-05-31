@@ -12,7 +12,13 @@ pip install httpx[http2] groq
 
 echo.
 echo Building exe...
-pyinstaller --onefile --noconsole --name VoiceToText ^
+REM Delete any stale exe first, so a failed build can't masquerade as success.
+if exist "dist\VoiceToText.exe" del /q "dist\VoiceToText.exe"
+
+REM torch/silero-vad removed: VAD is now a pure-numpy RMS gate (recorder.py).
+REM --noupx: UPX raises AV false-positive rate and offers no size win here.
+REM Use "python -m PyInstaller": the bare "pyinstaller" command is NOT on PATH here.
+python -m PyInstaller --onefile --noconsole --noupx --name VoiceToText ^
   --icon=icon.ico ^
   --hidden-import=pynput.keyboard._win32 ^
   --hidden-import=pynput.mouse._win32 ^
@@ -21,9 +27,12 @@ pyinstaller --onefile --noconsole --name VoiceToText ^
   --hidden-import=h2 ^
   --hidden-import=hpack ^
   --hidden-import=hyperframe ^
-  --hidden-import=silero_vad ^
-  --collect-data silero_vad ^
-  --collect-data torch ^
+  --exclude-module=torch ^
+  --exclude-module=silero_vad ^
+  --exclude-module=transformers ^
+  --exclude-module=scipy ^
+  --exclude-module=sklearn ^
+  --exclude-module=matplotlib ^
   --add-data "icon.png;." ^
   --add-data "icon.ico;." ^
   main.py
