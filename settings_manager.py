@@ -40,7 +40,8 @@ DEFAULT_CONFIG = {
     # Peak-RMS gate (0..1) below which a recording is treated as silent/empty.
     "silence_threshold": 0.010,
     # Play short UI sound effects on record start/stop/done.
-    "sounds_enabled": True,
+    # Default OFF; users can enable it in Settings (volume is kept low).
+    "sounds_enabled": False,
     "hotkey": "f2",
     "mode": "toggle",
     "language": "ja",

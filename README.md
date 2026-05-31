@@ -2,7 +2,7 @@
 
 [English](#english) | [日本語](#日本語)
 
-> **v3.0.0** — Groq 一本化・起動高速化（339MB→89MB）・AI校正モード・モダンUIに刷新
+> **v3.0.1** — Groq 一本化・起動高速化（339MB→89MB）・AI校正モード・モダンUIに刷新
 
 ---
 
@@ -19,13 +19,13 @@ SuperWhisper / Aqua Voice にインスパイアされた音声入力デスクト
 - **ユーザー辞書** — よく使う固有名詞・専門用語を登録すると Whisper の認識精度が向上
 - **音声コマンド** — 「エンター」で改行、「まる」で句点など（最長一致で正確に変換）
 - **モダンなフローティングボタン** — 画面右下に常時表示のティール／シアンの縦長カプセル。上＝マイク（録音ON/OFF）、下＝Enter。ドラッグで移動可能・常に最前面に自動固定
-- **状態が一目でわかる** — 状態ドット（待機/録音/処理中/完了）＋効果音（録音開始・停止・完了）
+- **状態が一目でわかる** — 状態ドット（待機/録音/処理中/完了）。効果音（録音開始・停止・完了）は**既定OFF**・設定でON可能（音量は控えめ）
 - **システムトレイ常駐** — バックグラウンドで静かに動作
 - **波形オーバーレイ** — 録音中にリアルタイム波形表示
 
 ### インストール（exe版・推奨）
 
-1. [Releases](https://github.com/zunovia/voice_to_text_01/releases) から **VoiceToText-v3.0.0.zip** をダウンロード
+1. [最新リリース](https://github.com/zunovia/voice_to_text_01/releases/latest) から `VoiceToText-*.zip`（最新版）をダウンロード
 2. ZIPを任意のフォルダに展開
 3. `install.bat` をダブルクリックで実行
 4. デスクトップに「Voice to Text」ショートカットが作成されます（OneDrive のデスクトップにも正しく対応）
@@ -33,6 +33,19 @@ SuperWhisper / Aqua Voice にインスパイアされた音声入力デスクト
 6. 初回起動時に Groq API Key の入力画面が表示されます（取得方法は下記参照）
 
 > **SmartScreenの警告が出た場合:** 「詳細情報」→「実行」をクリックしてください（初回のみ）
+
+### Groq API キーの取得（無料・約3分）
+
+このアプリを使うには **無料の Groq API キー** が必要です（利用者ごとに各自で取得）。初回起動時に入力を求められます。
+
+1. https://console.groq.com にアクセス
+2. Google アカウント等でサインアップ（無料・クレジットカード不要）
+3. 左メニューの **API Keys** → **Create API Key**
+4. 表示されたキー（`gsk_...` で始まる）をコピー
+5. アプリ初回起動時の画面に貼り付けて「はじめる」をクリック
+
+> 無料枠：音声認識 2,000回/日 ＋ 整形 14,400回/日。個人利用なら実質無料です。
+> アプリの初回画面にも「取得する」リンクがあり、そこから取得ページを直接開けます。
 
 ### クイックスタート（ソースから実行）
 
@@ -106,7 +119,7 @@ python main.py
   "stt_model": "whisper-large-v3-turbo",     // 認識モデル（turbo=高速 / whisper-large-v3=高精度）
   "vocabulary": "",                           // よく使う固有名詞・専門用語（スペース区切り・精度向上）
   "silence_threshold": 0.010,                // 無音判定のRMS閾値（小声を拾わない時は下げる）
-  "sounds_enabled": true                     // 効果音（録音開始/停止/完了）
+  "sounds_enabled": false                    // 効果音（既定OFF・設定でON可・音量控えめ）
 }
 ```
 
@@ -159,20 +172,32 @@ A SuperWhisper / Aqua Voice inspired voice-to-text desktop app. Press a hotkey, 
 - **Custom dictionary** — Register frequent names/jargon to bias Whisper toward correct spellings
 - **Voice commands** — Say "enter" for newline, "period" for punctuation (longest-match replacement)
 - **Modern floating button** — A teal/cyan vertical capsule at the bottom-right: mic (top) + Enter (bottom). Draggable, auto-pinned to the top of the z-order
-- **At-a-glance state** — Status dot (idle / listening / processing / done) + sound cues (start / stop / done)
+- **At-a-glance state** — Status dot (idle / listening / processing / done). Sound cues (start / stop / done) are **off by default** (enable in Settings; volume kept low)
 - **System tray** — Runs quietly in the background
 - **Recording overlay** — Live waveform while recording
 
 ### Install (exe — Recommended)
 
-1. Download **VoiceToText-v3.0.0.zip** from [Releases](https://github.com/zunovia/voice_to_text_01/releases)
+1. Download `VoiceToText-*.zip` (latest) from the [latest release](https://github.com/zunovia/voice_to_text_01/releases/latest)
 2. Extract the ZIP to any folder
 3. Double-click `install.bat`
 4. A "Voice to Text" shortcut is created on your desktop (OneDrive desktops handled correctly)
 5. Double-click the shortcut to launch
-6. Enter your Groq API Key in the first-run dialog
+6. Enter your Groq API Key in the first-run dialog (see below)
 
 > **If SmartScreen appears:** Click "More info" → "Run anyway" (first time only)
+
+### Get a Groq API Key (free, ~3 min)
+
+This app needs a **free Groq API key** (each user gets their own). You'll be prompted on first launch.
+
+1. Go to https://console.groq.com
+2. Sign up (free, no credit card)
+3. **API Keys** → **Create API Key**
+4. Copy the key (starts with `gsk_...`)
+5. Paste it into the first-run dialog and click Start
+
+> Free tier: 2,000 STT + 14,400 LLM requests/day — effectively free for personal use. The first-run dialog also has a "Get key" link.
 
 ### Quick Start (from source)
 
@@ -216,7 +241,7 @@ Edit `config.json` (`%LOCALAPPDATA%\VoiceToText\config.json`) or use the Setting
   "stt_model": "whisper-large-v3-turbo",     // turbo (fast) or whisper-large-v3 (accurate)
   "vocabulary": "",                           // space-separated names/jargon to improve accuracy
   "silence_threshold": 0.010,                // RMS gate for empty-recording detection
-  "sounds_enabled": true
+  "sounds_enabled": false                    // sound cues: OFF by default, enable in Settings
 }
 ```
 

@@ -30,7 +30,8 @@ _paths = {}          # name -> wav file path
 _lock = threading.Lock()
 
 SR = 16000
-VOLUME = 0.22
+VOLUME = 0.10  # quiet by default; sound effects are also OFF unless enabled
+_SOUND_VER = "v2"  # bump to force regeneration when volume/design changes
 
 # name -> list of (frequency_hz, duration_seconds) segments played in order
 _DEFS = {
@@ -76,7 +77,7 @@ def _ensure_files():
             sounds_dir = os.path.join(_app_dir(), "sounds")
             os.makedirs(sounds_dir, exist_ok=True)
             for name, segs in _DEFS.items():
-                path = os.path.join(sounds_dir, f"{name}.wav")
+                path = os.path.join(sounds_dir, f"{name}_{_SOUND_VER}.wav")
                 if not os.path.exists(path):
                     data = _synth(segs)
                     with wave.open(path, "wb") as wf:
