@@ -1,9 +1,12 @@
 {
   "api_key": "",
-  "gemini_api_key": "",
   "use_llm_cleanup": true,
   "llm_provider": "groq",
-  "groq_llm_model": "llama-3.1-8b-instant",
+  "groq_llm_model": "openai/gpt-oss-20b",
+  "stt_model": "whisper-large-v3-turbo",
+  "vocabulary": "",
+  "silence_threshold": 0.010,
+  "sounds_enabled": true,
   "hotkey": "f2",
   "mode": "toggle",
   "language": "ja",
@@ -21,6 +24,8 @@
     "かっことじ": "）",
     "かぎかっこ": "「",
     "かぎかっことじ": "」",
+    "すみかっこ": "【",
+    "すみかっことじ": "】",
     "タブ": "\t",
     "スペース": " "
   }
